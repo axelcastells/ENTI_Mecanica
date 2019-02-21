@@ -4,6 +4,7 @@
 
 #define PARTICLE_COUNT 5000
 
+
 class ParticleSystem {
 public:
 	ParticleSystem(){}
@@ -25,8 +26,8 @@ public:
 		return &particlePositions[0].x;
 	}
 
-	
-private:
 	glm::vec3 particlePositions[PARTICLE_COUNT];
 	glm::vec3 particleVelocities[PARTICLE_COUNT];
+private:
+
 };

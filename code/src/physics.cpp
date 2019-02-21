@@ -99,12 +99,40 @@ void GUI() {
 }
 
 // ------------------------------------------------------------------------------------------
+struct ForceActuator { 
+	virtual glm::vec3 computeForce(float mass, const glm::vec3& position) = 0; 
+};
+
+struct Collider {
+	virtual bool checkCollision(const glm::vec3& prev_pos, const glm::vec3& next_pos) = 0; 
+	virtual void getPlane(glm::vec3& normal, float& d) = 0; 
+	void computeCollision(const glm::vec3& old_pos, const glm::vec3& old_vel, glm::vec3& new_pos, glm::vec3& new_vel) 
+	{
+		//...
+	}
+};
+struct PlaneCol : Collider {
+	//...
+};
+struct SphereCol : Collider {
+	//...
+};
+struct CapsuleCol : Collider {
+	//...
+};
+
+void euler(float dt, ParticleSystem& particles, const std::vector<Collider*>& colliders, const std::vector<ForceActuator*>& force_acts) {
+	for (int i = 0; i < PARTICLE_COUNT; i++) {
+		particles.particlePositions[i] = particles.particlePositions[i] + (dt * particles.particleVelocities[i]);
+		particles.particleVelocities[i] = particles.particleVelocities[i] + (dt * particles.particleVelocities[i]);
+	}
+}
 
 ParticleSystem ps = ParticleSystem();
 
 void PhysicsInit() {
 	// Do your initialization code here...
-	for (int i = 0; i < 5000; i++) {
+	for (int i = 0; i < PARTICLE_COUNT; i++) {
 		float f = Tools::Random();
 		glm::vec3 newPos(
 			Tools::Map(Tools::Random(), 0, 1, -5, 5), 
