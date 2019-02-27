@@ -4,6 +4,8 @@
 #include "ParticleSystem.h"
 #include "Tools.h"
 
+#pragma region Program
+
 namespace Box {
 	void drawCube();
 }
@@ -97,38 +99,93 @@ void GUI() {
 		ImGui::ShowTestWindow(&show_test_window);
 	}
 }
-
+#pragma endregion
 // ------------------------------------------------------------------------------------------
+#define GRAVITY_FORCE 9.81f
+// Force Actuators
 struct ForceActuator { 
 	virtual glm::vec3 computeForce(float mass, const glm::vec3& position) = 0; 
 };
 
+struct GravityForce : ForceActuator {
+	glm::vec3 computeForce(float mass, const glm::vec3& position) override {
+		return glm::vec3(position.x, position.y + (mass * GRAVITY_FORCE), position.z);
+	}
+};
+
+struct PositionalGravityForce : ForceActuator {
+	glm::vec3 computeForce(float mass, const glm::vec3& position) override {
+
+	}
+};
+// ------------------------------------------------------------------------------------------
+
+// Colliders
 struct Collider {
 	virtual bool checkCollision(const glm::vec3& prev_pos, const glm::vec3& next_pos) = 0; 
 	virtual void getPlane(glm::vec3& normal, float& d) = 0; 
 	void computeCollision(const glm::vec3& old_pos, const glm::vec3& old_vel, glm::vec3& new_pos, glm::vec3& new_vel) 
 	{
-		//...
+		if (checkCollision(old_pos, new_pos)) {
+			glm::vec3 normal;
+			float d;
+			getPlane(normal, d);
+
+			new_pos = old_pos - 2 * (glm::dot(normal, old_pos) + d) * normal;
+			new_vel = old_vel - 2 * (glm::dot(normal, old_vel) + d) * normal;
+		}
 	}
 };
 struct PlaneCol : Collider {
 	//...
+	bool checkCollision(const glm::vec3& prev_pos, const glm::vec3& next_pos) override {
+
+	}
+	void getPlane(glm::vec3& normal, float& d) override {
+
+	}
 };
 struct SphereCol : Collider {
 	//...
+	bool checkCollision(const glm::vec3& prev_pos, const glm::vec3& next_pos) override {
+		return false;
+	}
+	void getPlane(glm::vec3& normal, float& d) override {
+
+	}
 };
 struct CapsuleCol : Collider {
 	//...
+	bool checkCollision(const glm::vec3& prev_pos, const glm::vec3& next_pos) override {
+
+	}
+	void getPlane(glm::vec3& normal, float& d) override {
+
+	}
 };
 
 void euler(float dt, ParticleSystem& particles, const std::vector<Collider*>& colliders, const std::vector<ForceActuator*>& force_acts) {
 	for (int i = 0; i < PARTICLE_COUNT; i++) {
+		glm::vec3 accel;
+		for (int j = 0; i < force_acts.size(); i++) {
+			glm::vec3 force = force_acts[j]->computeForce(GLOBAL_PARTICLE_MASS, particles.particlePositions[i]);
+			//accel += glm::vec3(force.x / GLOBAL_PARTICLE_MASS, force.y / GLOBAL_PARTICLE_MASS, force.z / GLOBAL_PARTICLE_MASS);
+		}
+
+		particles.particleVelocities[i] = particles.particleVelocities[i] + (dt * accel);
 		particles.particlePositions[i] = particles.particlePositions[i] + (dt * particles.particleVelocities[i]);
-		particles.particleVelocities[i] = particles.particleVelocities[i] + (dt * particles.particleVelocities[i]);
+
+		for (int j = 0; i < colliders.size(); i++) {
+			colliders[j]->computeCollision(particles.particlePositions[i], particles.particleVelocities[i], 
+											particles.particlePositions[i], particles.particleVelocities[i]);
+		}
+
 	}
 }
 
 ParticleSystem ps = ParticleSystem();
+std::vector<ForceActuator*> forces;
+std::vector<Collider*> colliders;
 
 void PhysicsInit() {
 	// Do your initialization code here...
@@ -139,20 +196,26 @@ void PhysicsInit() {
 			Tools::Map(Tools::Random(), 0, 1, 5, 10), 
 			Tools::Map(Tools::Random(), 0, 1, -5, 5));
 
-		glm::vec3 newVel(
-			Tools::Random() * 5,
-			Tools::Random() * 5,
-			Tools::Random() * 5);
+		//glm::vec3 newVel(
+		//	Tools::Random() * 5,
+		//	Tools::Random() * 5,
+		//	Tools::Random() * 5);
 
-		ps.SetParticle(i, newPos, newVel);
+		ps.SetParticle(i, newPos, glm::vec3(0));
 
 		ps.ParticlesPtr();
 	}
+
+	forces.push_back(new GravityForce());
+	colliders.push_back(new SphereCol());
 	// ...................................
 }
 
 void PhysicsUpdate(float dt) {
 	// Do your update code here...
+
+	euler(dt, ps, colliders, forces);
+
 	Particles::updateParticles(0, PARTICLE_COUNT, ps.ParticlesPtr());
 	// ...........................
 }

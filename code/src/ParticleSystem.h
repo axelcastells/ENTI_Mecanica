@@ -3,7 +3,7 @@
 #include <vector>
 
 #define PARTICLE_COUNT 5000
-
+#define GLOBAL_PARTICLE_MASS 1
 
 class ParticleSystem {
 public:
