@@ -225,7 +225,13 @@ void PhysicsInit() {
 	}
 
 	forces.push_back(new GravityForce());
-	colliders.push_back(new PlaneCol(glm::vec3(0,0,0), glm::vec3(0,-1,0)));
+
+	colliders.push_back(new PlaneCol(glm::vec3(0, 0, 0), glm::vec3(0, -1, 0)));
+	colliders.push_back(new PlaneCol(glm::vec3(0, 10, 0), glm::vec3(0, 1, 0)));
+	colliders.push_back(new PlaneCol(glm::vec3(-5, 0, 0), glm::vec3(-1, 0, 0)));
+	colliders.push_back(new PlaneCol(glm::vec3(5, 0, 0), glm::vec3(1, 0, 0)));
+	colliders.push_back(new PlaneCol(glm::vec3(0, 0, -5), glm::vec3(0, 0, -1)));
+	colliders.push_back(new PlaneCol(glm::vec3(0, 0, 5), glm::vec3(0, 0, 1)));
 	// ...................................
 }
 
