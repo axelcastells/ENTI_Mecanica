@@ -102,6 +102,8 @@ void GUI() {
 #pragma endregion
 // ------------------------------------------------------------------------------------------
 #define GRAVITY_FORCE 9.81f
+#define BOUNCE_ELASTICITY 0.8f
+
 // Force Actuators
 struct ForceActuator { 
 	virtual glm::vec3 computeForce(float mass, const glm::vec3& position) = 0; 
@@ -131,8 +133,8 @@ struct Collider {
 			float d;
 			getPlane(normal, d);
 
-			new_pos = new_pos - (2 * glm::dot(normal, new_pos) + d) * normal;
-			new_vel = new_vel - (2 * glm::dot(normal, new_vel)) * normal;
+			new_pos = new_pos - ((1 + BOUNCE_ELASTICITY) * glm::dot(normal, new_pos) + d) * normal;
+			new_vel = new_vel - ((1 + BOUNCE_ELASTICITY) * glm::dot(normal, new_vel)) * normal;
 		}
 	}
 };
