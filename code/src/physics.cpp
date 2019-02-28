@@ -146,10 +146,6 @@ struct PlaneCol : Collider {
 		planeNormal = norm;
 	}
 	bool checkCollision(const glm::vec3& prev_pos, const glm::vec3& next_pos) override {
-		glm::vec3 direction = (next_pos - prev_pos);
-		float magnitude = glm::sqrt(glm::pow(direction.x, 2) + glm::pow(direction.x, 2) + glm::pow(direction.x, 2));
-		glm::vec3 normalizedDirection = direction / magnitude;
-
 		glm::vec3 norm;
 		float d;
 		getPlane(norm, d);
@@ -168,7 +164,15 @@ struct PlaneCol : Collider {
 };
 struct SphereCol : Collider {
 	//...
+	glm::vec3 position;
+	float radius;
+	
 	bool checkCollision(const glm::vec3& prev_pos, const glm::vec3& next_pos) override {
+		glm::vec3 vector = next_pos - position;
+		float magnitude = glm::sqrt(glm::pow(vector.x, 2) + glm::pow(vector.y, 2) + glm::pow(vector.z, 2));
+		float distance = glm::abs(magnitude);
+		
+		if (distance <= radius) return true;
 		return false;
 	}
 	void getPlane(glm::vec3& normal, float& d) override {
@@ -178,7 +182,7 @@ struct SphereCol : Collider {
 struct CapsuleCol : Collider {
 	//...
 	bool checkCollision(const glm::vec3& prev_pos, const glm::vec3& next_pos) override {
-
+		
 	}
 	void getPlane(glm::vec3& normal, float& d) override {
 
