@@ -109,7 +109,7 @@ struct ForceActuator {
 
 struct GravityForce : ForceActuator {
 	glm::vec3 computeForce(float mass, const glm::vec3& position) override {
-		return glm::vec3(position.x, position.y + (mass * GRAVITY_FORCE), position.z);
+		return glm::vec3(0, mass * -GRAVITY_FORCE, 0);
 	}
 };
 
@@ -131,18 +131,37 @@ struct Collider {
 			float d;
 			getPlane(normal, d);
 
-			new_pos = old_pos - 2 * (glm::dot(normal, old_pos) + d) * normal;
-			new_vel = old_vel - 2 * (glm::dot(normal, old_vel) + d) * normal;
+			new_pos = new_pos - (2 * glm::dot(normal, new_pos) + d) * normal;
+			new_vel = new_vel - (2 * glm::dot(normal, new_vel)) * normal;
 		}
 	}
 };
 struct PlaneCol : Collider {
 	//...
+	glm::vec3 planePosition, planeNormal;
+	PlaneCol(glm::vec3 pos, glm::vec3 norm) {
+		planePosition = pos;
+		planeNormal = norm;
+	}
 	bool checkCollision(const glm::vec3& prev_pos, const glm::vec3& next_pos) override {
+		glm::vec3 direction = (next_pos - prev_pos);
+		float magnitude = glm::sqrt(glm::pow(direction.x, 2) + glm::pow(direction.x, 2) + glm::pow(direction.x, 2));
+		glm::vec3 normalizedDirection = direction / magnitude;
+
+		glm::vec3 norm;
+		float d;
+		getPlane(norm, d);
+
+		float distance = glm::dot(norm, (next_pos - planePosition));
+		distance *= -1;
+
+		if (distance <= 0) return true;
+		else return false;
 
 	}
 	void getPlane(glm::vec3& normal, float& d) override {
-
+		normal = planeNormal;
+		d = glm::dot(-planeNormal, planePosition);
 	}
 };
 struct SphereCol : Collider {
@@ -166,16 +185,15 @@ struct CapsuleCol : Collider {
 
 void euler(float dt, ParticleSystem& particles, const std::vector<Collider*>& colliders, const std::vector<ForceActuator*>& force_acts) {
 	for (int i = 0; i < PARTICLE_COUNT; i++) {
-		glm::vec3 accel;
-		for (int j = 0; i < force_acts.size(); i++) {
-			glm::vec3 force = force_acts[j]->computeForce(GLOBAL_PARTICLE_MASS, particles.particlePositions[i]);
-			//accel += glm::vec3(force.x / GLOBAL_PARTICLE_MASS, force.y / GLOBAL_PARTICLE_MASS, force.z / GLOBAL_PARTICLE_MASS);
+		glm::vec3 forces;
+		for (int j = 0; j < force_acts.size(); j++) {
+			forces += force_acts[j]->computeForce(GLOBAL_PARTICLE_MASS, particles.particlePositions[i]);
 		}
+		glm::vec3 accel = glm::vec3(forces.x / GLOBAL_PARTICLE_MASS, forces.y / GLOBAL_PARTICLE_MASS, forces.z / GLOBAL_PARTICLE_MASS);
+		particles.particleVelocities[i] += (dt * accel);
+		particles.particlePositions[i] += (dt * particles.particleVelocities[i]);
 
-		particles.particleVelocities[i] = particles.particleVelocities[i] + (dt * accel);
-		particles.particlePositions[i] = particles.particlePositions[i] + (dt * particles.particleVelocities[i]);
-
-		for (int j = 0; i < colliders.size(); i++) {
+		for (int j = 0; j < colliders.size(); j++) {
 			colliders[j]->computeCollision(particles.particlePositions[i], particles.particleVelocities[i], 
 											particles.particlePositions[i], particles.particleVelocities[i]);
 		}
@@ -202,12 +220,10 @@ void PhysicsInit() {
 		//	Tools::Random() * 5);
 
 		ps.SetParticle(i, newPos, glm::vec3(0));
-
-		ps.ParticlesPtr();
 	}
 
 	forces.push_back(new GravityForce());
-	colliders.push_back(new SphereCol());
+	colliders.push_back(new PlaneCol(glm::vec3(0,0,0), glm::vec3(0,-1,0)));
 	// ...................................
 }
 
