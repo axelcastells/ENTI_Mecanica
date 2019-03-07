@@ -103,6 +103,7 @@ void GUI() {
 // ------------------------------------------------------------------------------------------
 #define GRAVITY_FORCE 9.81f
 #define BOUNCE_ELASTICITY 0.8f
+#define GRAVITY_VECTOR glm::vec3(.5f,.5f,0)
 
 // Force Actuators
 struct ForceActuator { 
@@ -111,7 +112,7 @@ struct ForceActuator {
 
 struct GravityForce : ForceActuator {
 	glm::vec3 computeForce(float mass, const glm::vec3& position) override {
-		return glm::vec3(0, mass * -GRAVITY_FORCE, 0);
+		return GRAVITY_VECTOR * (mass * GRAVITY_FORCE);
 	}
 };
 
@@ -133,8 +134,8 @@ struct Collider {
 			float d;
 			getPlane(normal, d);
 
-			new_pos = new_pos - ((1 + BOUNCE_ELASTICITY) * glm::dot(normal, new_pos) + d) * normal;
-			new_vel = new_vel - ((1 + BOUNCE_ELASTICITY) * glm::dot(normal, new_vel)) * normal;
+			new_pos = new_pos - (1 + BOUNCE_ELASTICITY) * (glm::dot(normal, new_pos) + d) * normal;
+			new_vel = new_vel - (1 + BOUNCE_ELASTICITY) * glm::dot(normal, new_vel) * normal;
 		}
 	}
 };
@@ -150,8 +151,7 @@ struct PlaneCol : Collider {
 		float d;
 		getPlane(norm, d);
 
-		float distance = glm::dot(norm, (next_pos - planePosition));
-		distance *= -1;
+		float distance = -((next_pos.x * norm.x) + (next_pos.y * norm.y) + (next_pos.z * norm.z) + d);//glm::dot(norm, (next_pos - planePosition));
 
 		if (distance <= 0) return true;
 		else return false;
