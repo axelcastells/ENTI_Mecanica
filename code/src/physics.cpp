@@ -42,7 +42,42 @@ namespace Cube {
 	extern void drawCube();
 }
 
+//defines pel GUI
+#define minPmass 1.0
+#define maxPmass 10.0
 
+#define minSphmass 1.0
+#define maxSphmass 10.0
+
+#define minSphposX 0.0
+#define maxSphposX 10.0
+#define minSphposY 0.0
+#define maxSphposY 10.0
+#define minSphposZ 0.0
+#define maxSphposZ 10.0
+
+#define minSphrad 0.1
+#define maxSphrad 5.0
+
+#define minCapposA_X 0.0
+#define maxCapposA_X 10.0
+#define minCapposA_Y 0.0
+#define maxCapposA_Y 10.0
+#define minCapposA_Z 0.0
+#define maxCapposA_Z 10.0
+
+#define minCapposB_X 0.0
+#define maxCapposB_X 10.0
+#define minCapposB_Y 0.0
+#define maxCapposB_Y 10.0
+#define minCapposB_Z 0.0
+#define maxCapposB_Z 10.0
+
+#define minCaprad 0.1
+#define maxCaprad 5.0
+
+#define minGrabAccel 1.0
+#define maxGrabAccel 10.0
 
 // Boolean variables allow to show/hide the primitives
 bool renderSphere = true;
@@ -78,23 +113,81 @@ void renderPrims() {
 		Cube::drawCube();
 }
 
+//Variables GUI
+
+bool Play;
+float ParticleMass;
+float Elasticity;
+float Friction;
+
+bool SphereCollider;
+float SphereMass;
+float SpherePositionX;
+float SpherePositionY;
+float SpherePositionZ;
+float SphereRadius;
+
+bool CapsuleCollider;
+float CapsulePositionX;
+float CapsulePositionY;
+float CapsulePositionZ;
+float CapsulePosition2X;
+float CapsulePosition2Y;
+float CapsulePosition2Z;
+float CapsuleRadius;
+
 
 void GUI() {
 	bool show = true;
 	ImGui::Begin("Physics Parameters", &show, 0);
 
 	// Do your GUI code here....
-	{	
+	{
 		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
-		
+
+		//Play simulation
+		ImGui::Checkbox("Play Simulation", &Play);
+		if (ImGui::Button("Reset", ImVec2(50, 20))) { //Trobar i reactivar la funcio que inicia la simulacio
+			PhysicsInit();
+		}
+		ImGui::DragFloat("Particle Mass", &ParticleMass, 0.1f, minPmass, maxPmass, "%.1f");
+
+		//Elasticitat i Friccio Particules
+		ImGui::Text("Elasticity & Friction");
+		ImGui::DragFloat("Elasticity", &Elasticity, 0.f, 0.0f, 1.0f, "%.1f");
+		ImGui::DragFloat("Friction", &Friction, 0.1f, 0.0f, 1.0f, "%.1f");
+
+		ImGui::Text("Colliders");
+		//Sphere
+		//Use Sphere Collider
+		ImGui::Checkbox("SphereCollider", &SphereCollider);
+		ImGui::DragFloat("Sphere Mass", &SphereMass, 1.0f, minSphmass, maxSphmass, "%.1f");
+		ImGui::DragFloat("Sphere Position X", &SpherePositionX, 1.0f, minSphposX, maxSphposX, "%.1f");
+		ImGui::DragFloat("Sphere Position Y", &SpherePositionY, 1.0f, minSphposY, maxSphposY, "%.1f");
+		ImGui::DragFloat("Sphere Position Z", &SpherePositionZ, 1.0f, minSphposZ, maxSphposZ, "%.1f");
+		ImGui::DragFloat("Sphere Radius", &SphereRadius, 0.1f, minSphrad, maxSphrad, "%.1f");
+		//Capsule
+		//Use Capsule Collider
+		ImGui::DragFloat("Capsule Pos A", &CapsulePositionX, 0.1f, minCapposA_X, maxCapposA_X, "%.1f");
+		ImGui::DragFloat("Capsule Pos A", &CapsulePositionY, 0.1f, minCapposA_Y, maxCapposA_Y, "%.1f");
+		ImGui::DragFloat("Capsule Pos A", &CapsulePositionZ, 0.1f, minCapposA_Z, maxCapposA_Z, "%.1f");
+		ImGui::DragFloat("Capsule Pos B", &CapsulePosition2X, 0.1f, minCapposB_X, maxCapposB_X, "%.1f");
+		ImGui::DragFloat("Capsule Pos B", &CapsulePosition2Y, 0.1f, minCapposB_Y, maxCapposB_Y, "%.1f");
+		ImGui::DragFloat("Capsule Pos B", &CapsulePosition2Z, 0.1f, minCapposB_Z, maxCapposB_Z, "%.1f");
+		ImGui::DragFloat("Capsule Radius", &CapsuleRadius, 0.1f, minCaprad, maxCaprad, "%.1f");
+
+		ImGui::Text("Forces");
+		//Use Gravity
+		ImGui::Checkbox("Activate Gravity", &Play);
+		ImGui::DragFloat("Gravity Accel", &GravityAccel, 1.0f, minGrabAccel, maxGrabAccel, "%.1f");
 	}
 	// .........................
-	
+
 	ImGui::End();
 
 	// Example code -- ImGui test window. Most of the sample code is in ImGui::ShowTestWindow()
 	bool show_test_window = 1;
-	if(show_test_window) {
+	if (show_test_window) {
 		ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);
 		ImGui::ShowTestWindow(&show_test_window);
 	}
