@@ -45,8 +45,8 @@ namespace Cube {
 
 
 // Boolean variables allow to show/hide the primitives
-bool renderSphere = false;
-bool renderCapsule = false;
+bool renderSphere = true;
+bool renderCapsule = true;
 bool renderParticles = true;
 bool renderMesh = false;
 bool renderFiber = false;
@@ -103,7 +103,15 @@ void GUI() {
 // ------------------------------------------------------------------------------------------
 #define GRAVITY_FORCE 9.81f
 #define BOUNCE_ELASTICITY 0.8f
-#define GRAVITY_VECTOR glm::vec3(.5f,.5f,0)
+#define FRICTION_FACTOR .2f
+#define GRAVITY_VECTOR glm::vec3(0,-1,0)
+
+#define SPHERE_POS {1,5,0}
+#define SPHERE_RAD 1.5f
+
+#define CAPSULE_POS_A {0,0,0}
+#define CAPSULE_POS_B {0,1,0}
+#define CAPSULE_RAD 1.f
 
 // Force Actuators
 struct ForceActuator { 
@@ -133,9 +141,15 @@ struct Collider {
 			glm::vec3 normal;
 			float d;
 			getPlane(normal, d);
+			
+			new_pos = old_pos - (1 + BOUNCE_ELASTICITY) * (glm::dot(normal, old_pos) + d) * normal;
+			new_vel = old_vel - (1 + BOUNCE_ELASTICITY) * glm::dot(normal, old_vel) * normal;
 
-			new_pos = new_pos - (1 + BOUNCE_ELASTICITY) * (glm::dot(normal, new_pos) + d) * normal;
-			new_vel = new_vel - (1 + BOUNCE_ELASTICITY) * glm::dot(normal, new_vel) * normal;
+			glm::vec3 nVel, tVel;
+			nVel = glm::dot(normal, old_vel) * normal;
+			tVel = old_vel - nVel;
+
+			new_vel = old_vel - (FRICTION_FACTOR * tVel);
 		}
 	}
 };
@@ -164,23 +178,42 @@ struct PlaneCol : Collider {
 };
 struct SphereCol : Collider {
 	//...
-	glm::vec3 position;
+	glm::vec3 position, collisionPoint;
 	float radius;
+
+	SphereCol(glm::vec3 _pos, float _rad) {
+		radius = _rad;
+		position = _pos;
+	}
 	
 	bool checkCollision(const glm::vec3& prev_pos, const glm::vec3& next_pos) override {
 		glm::vec3 vector = next_pos - position;
 		float magnitude = glm::sqrt(glm::pow(vector.x, 2) + glm::pow(vector.y, 2) + glm::pow(vector.z, 2));
 		float distance = glm::abs(magnitude);
 		
-		if (distance <= radius) return true;
+		if (distance <= radius) {
+			collisionPoint = next_pos;
+			return true;
+		}
 		return false;
 	}
 	void getPlane(glm::vec3& normal, float& d) override {
-
+		normal = collisionPoint - position;
+		float mag = glm::sqrt(glm::pow(normal.x, 2) + glm::pow(normal.y, 2) + glm::pow(normal.z, 2));
+		normal = normal / mag;
+		d = glm::dot(-normal, collisionPoint);
 	}
 };
 struct CapsuleCol : Collider {
 	//...
+	glm::vec3 posA, posB;
+	float radius;
+
+	CapsuleCol(glm::vec3 _posA, glm::vec3 _posB, float _rad) {
+		posA = _posA;
+		posB = _posB;
+		radius = _rad;
+	}
 	bool checkCollision(const glm::vec3& prev_pos, const glm::vec3& next_pos) override {
 		
 	}
@@ -236,6 +269,11 @@ void PhysicsInit() {
 	colliders.push_back(new PlaneCol(glm::vec3(5, 0, 0), glm::vec3(1, 0, 0)));
 	colliders.push_back(new PlaneCol(glm::vec3(0, 0, -5), glm::vec3(0, 0, -1)));
 	colliders.push_back(new PlaneCol(glm::vec3(0, 0, 5), glm::vec3(0, 0, 1)));
+	colliders.push_back(new SphereCol(SPHERE_POS, SPHERE_RAD));
+	colliders.push_back(new CapsuleCol(CAPSULE_POS_A, CAPSULE_POS_B, CAPSULE_RAD));
+
+	Sphere::updateSphere(SPHERE_POS, SPHERE_RAD);
+	//Capsule::updateCapsule(CAPSULE_POS_A, CAPSULE_POS_B, CAPSULE_RAD);
 	// ...................................
 }
 
