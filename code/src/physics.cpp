@@ -4,43 +4,21 @@
 #include "ParticleSystem.h"
 #include "Tools.h"
 
-#pragma region Program
+#pragma region GlobalData
+static bool PLAYING = true;
+static float TIME_FACTOR = 0.2f;
 
-namespace Box {
-	void drawCube();
-}
-namespace Axis {
-	void drawAxis();
-}
+static float GRAVITY_FORCE = 9.81f;
+static float BOUNCE_ELASTICITY = 0.8f;
+static float FRICTION_FACTOR = .2f;
+static glm::vec3 GRAVITY_VECTOR = { 0,-1,0 };
 
-namespace Sphere {
-	extern void updateSphere(glm::vec3 pos, float radius = 1.f);
-	extern void drawSphere();
-}
-namespace Capsule {
-	extern void updateCapsule(glm::vec3 posA, glm::vec3 posB, float radius = 1.f);
-	extern void drawCapsule();
-}
-namespace Particles {
-	extern const int maxParticles;
-	extern void updateParticles(int startIdx, int count, float* array_data);
-	extern void drawParticles(int startIdx, int count);
-}
-namespace Mesh {
-	extern const int numCols;
-	extern const int numRows;
-	extern void updateMesh(float* array_data);
-	extern void drawMesh();
-}
-namespace Fiber {
-extern const int numVerts;
-	extern void updateFiber(float* array_data);
-	extern void drawFiber();
-}
-namespace Cube {
-	extern void updateCube(const glm::mat4& transform);
-	extern void drawCube();
-}
+static glm::vec3 SPHERE_POS = { 1,5,0 };
+static float SPHERE_RAD = 1.5f;
+
+static glm::vec3 CAPSULE_POS_A = { -2,1,1 };
+static glm::vec3 CAPSULE_POS_B = { 2,1,1 };
+static float CAPSULE_RAD = 1.f;
 
 //defines pel GUI
 #define minPmass 1.0
@@ -78,6 +56,49 @@ namespace Cube {
 
 #define minGrabAccel 1.0
 #define maxGrabAccel 10.0
+#pragma endregion
+
+#pragma region Program
+
+void PhysicsInit();
+
+namespace Box {
+	void drawCube();
+}
+namespace Axis {
+	void drawAxis();
+}
+
+namespace Sphere {
+	extern void updateSphere(glm::vec3 pos, float radius = 1.f);
+	extern void drawSphere();
+}
+namespace Capsule {
+	extern void updateCapsule(glm::vec3 posA, glm::vec3 posB, float radius = 1.f);
+	extern void drawCapsule();
+}
+namespace Particles {
+	extern const int maxParticles;
+	extern void updateParticles(int startIdx, int count, float* array_data);
+	extern void drawParticles(int startIdx, int count);
+}
+namespace Mesh {
+	extern const int numCols;
+	extern const int numRows;
+	extern void updateMesh(float* array_data);
+	extern void drawMesh();
+}
+namespace Fiber {
+extern const int numVerts;
+	extern void updateFiber(float* array_data);
+	extern void drawFiber();
+}
+namespace Cube {
+	extern void updateCube(const glm::mat4& transform);
+	extern void drawCube();
+}
+
+
 
 // Boolean variables allow to show/hide the primitives
 bool renderSphere = true;
@@ -179,7 +200,7 @@ void GUI() {
 		ImGui::Text("Forces");
 		//Use Gravity
 		ImGui::Checkbox("Activate Gravity", &Play);
-		ImGui::DragFloat("Gravity Accel", &GravityAccel, 1.0f, minGrabAccel, maxGrabAccel, "%.1f");
+		ImGui::DragFloat("Gravity Accel", &GRAVITY_FORCE, 1.0f, minGrabAccel, maxGrabAccel, "%.1f");
 	}
 	// .........................
 
@@ -197,21 +218,7 @@ void GUI() {
 float Magnitude(glm::vec3 a, glm::vec3 b);
 
 // ------------------------------------------------------------------------------------------
-#pragma region GlobalData
-static float TIME_FACTOR = 0.2f;
 
-static float GRAVITY_FORCE = 9.81f;
-static float BOUNCE_ELASTICITY = 0.8f;
-static float FRICTION_FACTOR = .2f;
-static glm::vec3 GRAVITY_VECTOR = { 0,-1,0 };
-
-static glm::vec3 SPHERE_POS = { 1,5,0 };
-static float SPHERE_RAD = 1.5f;
-
-static glm::vec3 CAPSULE_POS_A = { -2,1,1 };
-static glm::vec3 CAPSULE_POS_B = { 2,1,1 };
-static float CAPSULE_RAD = 1.f;
-#pragma endregion
 
 // Force Actuators
 struct ForceActuator { 
