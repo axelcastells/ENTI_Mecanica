@@ -100,18 +100,25 @@ void GUI() {
 	}
 }
 #pragma endregion
+
+float Magnitude(glm::vec3 a, glm::vec3 b);
+
 // ------------------------------------------------------------------------------------------
-#define GRAVITY_FORCE 9.81f
-#define BOUNCE_ELASTICITY 0.8f
-#define FRICTION_FACTOR .2f
-#define GRAVITY_VECTOR glm::vec3(0,-1,0)
+#pragma region GlobalData
+static float TIME_FACTOR = 0.2f;
 
-#define SPHERE_POS {1,5,0}
-#define SPHERE_RAD 1.5f
+static float GRAVITY_FORCE = 9.81f;
+static float BOUNCE_ELASTICITY = 0.8f;
+static float FRICTION_FACTOR = .2f;
+static glm::vec3 GRAVITY_VECTOR = { 0,-1,0 };
 
-#define CAPSULE_POS_A {0,0,0}
-#define CAPSULE_POS_B {0,1,0}
-#define CAPSULE_RAD 1.f
+static glm::vec3 SPHERE_POS = { 1,5,0 };
+static float SPHERE_RAD = 1.5f;
+
+static glm::vec3 CAPSULE_POS_A = { -2,1,1 };
+static glm::vec3 CAPSULE_POS_B = { 2,1,1 };
+static float CAPSULE_RAD = 1.f;
+#pragma endregion
 
 // Force Actuators
 struct ForceActuator { 
@@ -206,7 +213,7 @@ struct SphereCol : Collider {
 };
 struct CapsuleCol : Collider {
 	//...
-	glm::vec3 posA, posB;
+	glm::vec3 posA, posB, collisionPoint;
 	float radius;
 
 	CapsuleCol(glm::vec3 _posA, glm::vec3 _posB, float _rad) {
@@ -215,7 +222,22 @@ struct CapsuleCol : Collider {
 		radius = _rad;
 	}
 	bool checkCollision(const glm::vec3& prev_pos, const glm::vec3& next_pos) override {
-		
+		glm::vec3 colPos;
+		float a;
+
+		glm::vec3 ab = (posA - posB);
+		float abMag = Magnitude(posA, posB);
+
+		a = glm::clamp(((glm::dot((next_pos - posB), ab) / abMag) / abMag), 0.f, 1.f);
+		colPos = posB + (posA - posB) * a;
+
+		float distance = Magnitude(next_pos, colPos) - radius;
+
+		if (distance <= 0) {
+			collisionPoint = next_pos;
+			return true;
+		}
+		return false;
 	}
 	void getPlane(glm::vec3& normal, float& d) override {
 
@@ -273,14 +295,14 @@ void PhysicsInit() {
 	colliders.push_back(new CapsuleCol(CAPSULE_POS_A, CAPSULE_POS_B, CAPSULE_RAD));
 
 	Sphere::updateSphere(SPHERE_POS, SPHERE_RAD);
-	//Capsule::updateCapsule(CAPSULE_POS_A, CAPSULE_POS_B, CAPSULE_RAD);
+	Capsule::updateCapsule(CAPSULE_POS_A, CAPSULE_POS_B, CAPSULE_RAD);
 	// ...................................
 }
 
 void PhysicsUpdate(float dt) {
 	// Do your update code here...
 
-	euler(dt, ps, colliders, forces);
+	euler(dt * TIME_FACTOR, ps, colliders, forces);
 
 	Particles::updateParticles(0, PARTICLE_COUNT, ps.ParticlesPtr());
 	// ...........................
@@ -289,4 +311,9 @@ void PhysicsUpdate(float dt) {
 void PhysicsCleanup() {
 	// Do your cleanup code here...
 	// ............................
+}
+
+float Magnitude(glm::vec3 a, glm::vec3 b) {
+	glm::vec3 x = b - a;
+	return glm::sqrt(glm::pow(x.x, 2) + glm::pow(x.y, 2) + glm::pow(x.z, 2));
 }
