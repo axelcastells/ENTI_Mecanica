@@ -413,9 +413,9 @@
    - When passing a label you can optionally specify extra unique ID information within string itself. 
      This helps solving the simpler collision cases. Use "##" to pass a complement to the ID that won't be visible to the end-user:
 
-       Button("Play");         // Label = "Play",   ID = hash of "Play"
-       Button("Play##foo1");   // Label = "Play",   ID = hash of "Play##foo1" (different from above)
-       Button("Play##foo2");   // Label = "Play",   ID = hash of "Play##foo2" (different from above)
+       Button("PLAYING");         // Label = "PLAYING",   ID = hash of "PLAYING"
+       Button("PLAYING##foo1");   // Label = "PLAYING",   ID = hash of "PLAYING##foo1" (different from above)
+       Button("PLAYING##foo2");   // Label = "PLAYING",   ID = hash of "PLAYING##foo2" (different from above)
 
    - If you want to completely hide the label, but still need an ID:
 
@@ -846,7 +846,7 @@ void ImGuiIO::AddInputCharactersUTF8(const char* utf8_chars)
 #define IM_F32_TO_INT8_UNBOUND(_VAL)    ((int)((_VAL) * 255.0f + ((_VAL)>=0 ? 0.5f : -0.5f)))   // Unsaturated, for display purpose 
 #define IM_F32_TO_INT8_SAT(_VAL)        ((int)(ImSaturate(_VAL) * 255.0f + 0.5f))               // Saturated, always output 0..255
 
-// Play it nice with Windows users. Notepad in 2015 still doesn't display text data with Unix-style \n.
+// PLAYING it nice with Windows users. Notepad in 2015 still doesn't display text data with Unix-style \n.
 #ifdef _WIN32
 #define IM_NEWLINE "\r\n"
 #else

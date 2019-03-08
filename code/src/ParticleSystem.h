@@ -8,7 +8,9 @@
 class ParticleSystem {
 public:
 	ParticleSystem(){}
-
+	~ParticleSystem() {
+		
+	}
 	void SetParticle(int index, glm::vec3 _pos, glm::vec3 _vel)
 	{
 

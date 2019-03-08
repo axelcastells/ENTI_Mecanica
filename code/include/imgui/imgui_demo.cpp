@@ -56,7 +56,7 @@
 #endif
 #endif
 
-// Play it nice with Windows users. Notepad in 2015 still doesn't display text data with Unix-style \n.
+// PLAYING it nice with Windows users. Notepad in 2015 still doesn't display text data with Unix-style \n.
 #ifdef _WIN32
 #define IM_NEWLINE "\r\n"
 #else

@@ -5,7 +5,10 @@
 #include "Tools.h"
 
 #pragma region GlobalData
-static bool PLAYING = true;
+static bool SPHERE_COLLISION = true;
+static bool CAPSULE_COLLISION = true;
+static bool PLAYING = false;
+static float PARTICLE_MASS = 1.f;
 static float TIME_FACTOR = 0.2f;
 
 static float GRAVITY_FORCE = 9.81f;
@@ -15,6 +18,7 @@ static glm::vec3 GRAVITY_VECTOR = { 0,-1,0 };
 
 static glm::vec3 SPHERE_POS = { 1,5,0 };
 static float SPHERE_RAD = 1.5f;
+static float SPHERE_MASS = 1.f;
 
 static glm::vec3 CAPSULE_POS_A = { -2,1,1 };
 static glm::vec3 CAPSULE_POS_B = { 2,1,1 };
@@ -134,29 +138,6 @@ void renderPrims() {
 		Cube::drawCube();
 }
 
-//Variables GUI
-
-bool Play;
-float ParticleMass;
-float Elasticity;
-float Friction;
-
-bool SphereCollider;
-float SphereMass;
-float SpherePositionX;
-float SpherePositionY;
-float SpherePositionZ;
-float SphereRadius;
-
-bool CapsuleCollider;
-float CapsulePositionX;
-float CapsulePositionY;
-float CapsulePositionZ;
-float CapsulePosition2X;
-float CapsulePosition2Y;
-float CapsulePosition2Z;
-float CapsuleRadius;
-
 
 void GUI() {
 	bool show = true;
@@ -166,40 +147,42 @@ void GUI() {
 	{
 		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
 
-		//Play simulation
-		ImGui::Checkbox("Play Simulation", &Play);
+		//PLAYING simulation
+		ImGui::Checkbox("PLAYING Simulation", &PLAYING);
+		ImGui::DragFloat("Time Scale", &TIME_FACTOR, 0.1f, 0.1f, 1.0f, "%.1f");
 		if (ImGui::Button("Reset", ImVec2(50, 20))) { //Trobar i reactivar la funcio que inicia la simulacio
 			PhysicsInit();
 		}
-		ImGui::DragFloat("Particle Mass", &ParticleMass, 0.1f, minPmass, maxPmass, "%.1f");
+		ImGui::DragFloat("Particle Mass", &PARTICLE_MASS, 0.1f, minPmass, maxPmass, "%.1f");
 
 		//Elasticitat i Friccio Particules
-		ImGui::Text("Elasticity & Friction");
-		ImGui::DragFloat("Elasticity", &Elasticity, 0.f, 0.0f, 1.0f, "%.1f");
-		ImGui::DragFloat("Friction", &Friction, 0.1f, 0.0f, 1.0f, "%.1f");
+		ImGui::Text("BOUNCE_ELASTICITY & FRICTION_FACTOR");
+		ImGui::DragFloat("BOUNCE_ELASTICITY", &BOUNCE_ELASTICITY, 0.f, 0.0f, 1.0f, "%.1f");
+		ImGui::DragFloat("FRICTION_FACTOR", &FRICTION_FACTOR, 0.1f, 0.0f, 1.0f, "%.1f");
 
 		ImGui::Text("Colliders");
 		//Sphere
 		//Use Sphere Collider
-		ImGui::Checkbox("SphereCollider", &SphereCollider);
-		ImGui::DragFloat("Sphere Mass", &SphereMass, 1.0f, minSphmass, maxSphmass, "%.1f");
-		ImGui::DragFloat("Sphere Position X", &SpherePositionX, 1.0f, minSphposX, maxSphposX, "%.1f");
-		ImGui::DragFloat("Sphere Position Y", &SpherePositionY, 1.0f, minSphposY, maxSphposY, "%.1f");
-		ImGui::DragFloat("Sphere Position Z", &SpherePositionZ, 1.0f, minSphposZ, maxSphposZ, "%.1f");
-		ImGui::DragFloat("Sphere Radius", &SphereRadius, 0.1f, minSphrad, maxSphrad, "%.1f");
+		ImGui::Checkbox("Sphere Collision", &SPHERE_COLLISION);
+		ImGui::DragFloat("Sphere Mass", &SPHERE_MASS, 1.0f, minSphmass, maxSphmass, "%.1f");
+		ImGui::DragFloat("Sphere Position X", &SPHERE_POS.x, 1.0f, minSphposX, maxSphposX, "%.1f");
+		ImGui::DragFloat("Sphere Position Y", &SPHERE_POS.y, 1.0f, minSphposY, maxSphposY, "%.1f");
+		ImGui::DragFloat("Sphere Position Z", &SPHERE_POS.z, 1.0f, minSphposZ, maxSphposZ, "%.1f");
+		ImGui::DragFloat("Sphere Radius", &SPHERE_RAD, 0.1f, minSphrad, maxSphrad, "%.1f");
 		//Capsule
 		//Use Capsule Collider
-		ImGui::DragFloat("Capsule Pos A", &CapsulePositionX, 0.1f, minCapposA_X, maxCapposA_X, "%.1f");
-		ImGui::DragFloat("Capsule Pos A", &CapsulePositionY, 0.1f, minCapposA_Y, maxCapposA_Y, "%.1f");
-		ImGui::DragFloat("Capsule Pos A", &CapsulePositionZ, 0.1f, minCapposA_Z, maxCapposA_Z, "%.1f");
-		ImGui::DragFloat("Capsule Pos B", &CapsulePosition2X, 0.1f, minCapposB_X, maxCapposB_X, "%.1f");
-		ImGui::DragFloat("Capsule Pos B", &CapsulePosition2Y, 0.1f, minCapposB_Y, maxCapposB_Y, "%.1f");
-		ImGui::DragFloat("Capsule Pos B", &CapsulePosition2Z, 0.1f, minCapposB_Z, maxCapposB_Z, "%.1f");
-		ImGui::DragFloat("Capsule Radius", &CapsuleRadius, 0.1f, minCaprad, maxCaprad, "%.1f");
+		ImGui::Checkbox("Capsule Collision", &CAPSULE_COLLISION);
+		ImGui::DragFloat("Capsule Pos A", &CAPSULE_POS_A.x, 0.1f, minCapposA_X, maxCapposA_X, "%.1f");
+		ImGui::DragFloat("Capsule Pos A", &CAPSULE_POS_A.y, 0.1f, minCapposA_Y, maxCapposA_Y, "%.1f");
+		ImGui::DragFloat("Capsule Pos A", &CAPSULE_POS_A.z, 0.1f, minCapposA_Z, maxCapposA_Z, "%.1f");
+		ImGui::DragFloat("Capsule Pos B", &CAPSULE_POS_B.x, 0.1f, minCapposB_X, maxCapposB_X, "%.1f");
+		ImGui::DragFloat("Capsule Pos B", &CAPSULE_POS_B.y, 0.1f, minCapposB_Y, maxCapposB_Y, "%.1f");
+		ImGui::DragFloat("Capsule Pos B", &CAPSULE_POS_B.z, 0.1f, minCapposB_Z, maxCapposB_Z, "%.1f");
+		ImGui::DragFloat("Capsule Radius", &CAPSULE_RAD, 0.1f, minCaprad, maxCaprad, "%.1f");
 
 		ImGui::Text("Forces");
 		//Use Gravity
-		ImGui::Checkbox("Activate Gravity", &Play);
+		ImGui::Checkbox("Activate Gravity", &PLAYING);
 		ImGui::DragFloat("Gravity Accel", &GRAVITY_FORCE, 1.0f, minGrabAccel, maxGrabAccel, "%.1f");
 	}
 	// .........................
@@ -285,27 +268,28 @@ struct PlaneCol : Collider {
 };
 struct SphereCol : Collider {
 	//...
-	glm::vec3 position, collisionPoint;
-	float radius;
+	glm::vec3 *position, collisionPoint;
+	float *radius, *mass;
 
-	SphereCol(glm::vec3 _pos, float _rad) {
+	SphereCol(glm::vec3 *_pos, float *_rad, float *_mass) {
 		radius = _rad;
 		position = _pos;
+		mass = _mass;
 	}
 	
 	bool checkCollision(const glm::vec3& prev_pos, const glm::vec3& next_pos) override {
-		glm::vec3 vector = next_pos - position;
+		glm::vec3 vector = next_pos - *position;
 		float magnitude = glm::sqrt(glm::pow(vector.x, 2) + glm::pow(vector.y, 2) + glm::pow(vector.z, 2));
 		float distance = glm::abs(magnitude);
 		
-		if (distance <= radius) {
+		if (distance <= *radius) {
 			collisionPoint = next_pos;
 			return true;
 		}
 		return false;
 	}
 	void getPlane(glm::vec3& normal, float& d) override {
-		normal = collisionPoint - position;
+		normal = collisionPoint - *position;
 		float mag = glm::sqrt(glm::pow(normal.x, 2) + glm::pow(normal.y, 2) + glm::pow(normal.z, 2));
 		normal = normal / mag;
 		d = glm::dot(-normal, collisionPoint);
@@ -313,10 +297,10 @@ struct SphereCol : Collider {
 };
 struct CapsuleCol : Collider {
 	//...
-	glm::vec3 posA, posB, collisionPoint;
-	float radius;
+	glm::vec3 *posA, *posB, collisionPoint;
+	float* radius;
 
-	CapsuleCol(glm::vec3 _posA, glm::vec3 _posB, float _rad) {
+	CapsuleCol(glm::vec3 *_posA, glm::vec3 *_posB, float *_rad) {
 		posA = _posA;
 		posB = _posB;
 		radius = _rad;
@@ -325,13 +309,13 @@ struct CapsuleCol : Collider {
 		glm::vec3 colPos;
 		float a;
 
-		glm::vec3 ab = (posA - posB);
-		float abMag = Magnitude(posA, posB);
+		glm::vec3 ab = (*posA - *posB);
+		float abMag = Magnitude(*posA, *posB);
 
-		a = glm::clamp(((glm::dot((next_pos - posB), ab) / abMag) / abMag), 0.f, 1.f);
-		colPos = posB + (posA - posB) * a;
+		a = glm::clamp(((glm::dot((next_pos - *posB), ab) / abMag) / abMag), 0.f, 1.f);
+		colPos = *posB + (posA - posB) * a;
 
-		float distance = Magnitude(next_pos, colPos) - radius;
+		float distance = Magnitude(next_pos, colPos) - *radius;
 
 		if (distance <= 0) {
 			collisionPoint = next_pos;
@@ -362,7 +346,7 @@ void euler(float dt, ParticleSystem& particles, const std::vector<Collider*>& co
 	}
 }
 
-ParticleSystem ps = ParticleSystem();
+ParticleSystem* ps = new ParticleSystem();
 std::vector<ForceActuator*> forces;
 std::vector<Collider*> colliders;
 
@@ -380,7 +364,7 @@ void PhysicsInit() {
 		//	Tools::Random() * 5,
 		//	Tools::Random() * 5);
 
-		ps.SetParticle(i, newPos, glm::vec3(0));
+		ps->SetParticle(i, newPos, glm::vec3(0));
 	}
 
 	forces.push_back(new GravityForce());
@@ -391,25 +375,29 @@ void PhysicsInit() {
 	colliders.push_back(new PlaneCol(glm::vec3(5, 0, 0), glm::vec3(1, 0, 0)));
 	colliders.push_back(new PlaneCol(glm::vec3(0, 0, -5), glm::vec3(0, 0, -1)));
 	colliders.push_back(new PlaneCol(glm::vec3(0, 0, 5), glm::vec3(0, 0, 1)));
-	colliders.push_back(new SphereCol(SPHERE_POS, SPHERE_RAD));
-	colliders.push_back(new CapsuleCol(CAPSULE_POS_A, CAPSULE_POS_B, CAPSULE_RAD));
+	colliders.push_back(new SphereCol(&SPHERE_POS, &SPHERE_RAD, &SPHERE_MASS));
+	colliders.push_back(new CapsuleCol(&CAPSULE_POS_A, &CAPSULE_POS_B, &CAPSULE_RAD));
 
-	Sphere::updateSphere(SPHERE_POS, SPHERE_RAD);
-	Capsule::updateCapsule(CAPSULE_POS_A, CAPSULE_POS_B, CAPSULE_RAD);
+
 	// ...................................
 }
 
 void PhysicsUpdate(float dt) {
 	// Do your update code here...
+	if (PLAYING) {
+		euler(dt * TIME_FACTOR, *ps, colliders, forces);
 
-	euler(dt * TIME_FACTOR, ps, colliders, forces);
+		Particles::updateParticles(0, PARTICLE_COUNT, ps->ParticlesPtr());
+	}
 
-	Particles::updateParticles(0, PARTICLE_COUNT, ps.ParticlesPtr());
+	Sphere::updateSphere(SPHERE_POS, SPHERE_RAD);
+	Capsule::updateCapsule(CAPSULE_POS_A, CAPSULE_POS_B, CAPSULE_RAD);
 	// ...........................
 }
 
 void PhysicsCleanup() {
 	// Do your cleanup code here...
+	delete(ps);
 	// ............................
 }
 
