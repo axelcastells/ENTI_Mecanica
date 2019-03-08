@@ -5,21 +5,25 @@
 #include "Tools.h"
 
 #pragma region GlobalData
+//Colisions
 static bool SPHERE_COLLISION = true;
 static bool CAPSULE_COLLISION = true;
+//Velocitat i Activacio del funcionament
 static bool PLAYING = false;
-static float PARTICLE_MASS = 1.f;
 static float TIME_FACTOR = 0.2f;
-
+//Masa de les particules
+static float PARTICLE_MASS = 1.f;
+// Factors de gravetat
 static float GRAVITY_FORCE = 9.81f;
+static glm::vec3 GRAVITY_VECTOR = { 0,-1,0 };
+//Friccio i Elasticitat
 static float BOUNCE_ELASTICITY = 0.8f;
 static float FRICTION_FACTOR = .2f;
-static glm::vec3 GRAVITY_VECTOR = { 0,-1,0 };
-
+//Factors Esfera
 static glm::vec3 SPHERE_POS = { 1,5,0 };
 static float SPHERE_RAD = 1.5f;
 static float SPHERE_MASS = 1.f;
-
+//Factors Capsula
 static glm::vec3 CAPSULE_POS_A = { -2,1,1 };
 static glm::vec3 CAPSULE_POS_B = { 2,1,1 };
 static float CAPSULE_RAD = 1.f;
@@ -31,12 +35,12 @@ static float CAPSULE_RAD = 1.f;
 #define minSphmass 1.0
 #define maxSphmass 10.0
 
-#define minSphposX 0.0
-#define maxSphposX 10.0
+#define minSphposX -5.0
+#define maxSphposX 5.0
 #define minSphposY 0.0
 #define maxSphposY 10.0
-#define minSphposZ 0.0
-#define maxSphposZ 10.0
+#define minSphposZ -5.0
+#define maxSphposZ 5.0
 
 #define minSphrad 0.1
 #define maxSphrad 5.0
@@ -58,13 +62,14 @@ static float CAPSULE_RAD = 1.f;
 #define minCaprad 0.1
 #define maxCaprad 5.0
 
-#define minGrabAccel 1.0
-#define maxGrabAccel 10.0
+#define minGrabAccel 0.0
+#define maxGrabAccel 0.15
 #pragma endregion
 
 #pragma region Program
 
 void PhysicsInit();
+
 
 namespace Box {
 	void drawCube();
@@ -148,42 +153,42 @@ void GUI() {
 		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
 
 		//PLAYING simulation
-		ImGui::Checkbox("PLAYING Simulation", &PLAYING);
-		ImGui::DragFloat("Time Scale", &TIME_FACTOR, 0.1f, 0.1f, 1.0f, "%.1f");
-		if (ImGui::Button("Reset", ImVec2(50, 20))) { //Trobar i reactivar la funcio que inicia la simulacio
+		ImGui::Checkbox("Play/Pause the Simulation", &PLAYING);
+		ImGui::DragFloat("Speed", &TIME_FACTOR, 0.1f, 0.1f, 1.0f, "%.3f");
+		if (ImGui::Button("Reset the Simulation", ImVec2(50, 20))) { //Trobar i reactivar la funcio que inicia la simulacio
 			PhysicsInit();
 		}
-		ImGui::DragFloat("Particle Mass", &PARTICLE_MASS, 0.1f, minPmass, maxPmass, "%.1f");
+		ImGui::DragFloat("Particle Mass", &PARTICLE_MASS, 0.05f, minPmass, maxPmass, "%.3f");
 
 		//Elasticitat i Friccio Particules
-		ImGui::Text("BOUNCE_ELASTICITY & FRICTION_FACTOR");
-		ImGui::DragFloat("BOUNCE_ELASTICITY", &BOUNCE_ELASTICITY, 0.f, 0.0f, 1.0f, "%.1f");
-		ImGui::DragFloat("FRICTION_FACTOR", &FRICTION_FACTOR, 0.1f, 0.0f, 1.0f, "%.1f");
+		ImGui::Text("Elasticity & Friction");
+		ImGui::DragFloat("Elasticity", &BOUNCE_ELASTICITY, 0.05f, 0.0f, 1.0f, "%.3f");
+		ImGui::DragFloat("Friction", &FRICTION_FACTOR, 0.05f, 0.0f, 1.0f, "%.3f");
 
 		ImGui::Text("Colliders");
 		//Sphere
 		//Use Sphere Collider
 		ImGui::Checkbox("Sphere Collision", &SPHERE_COLLISION);
-		ImGui::DragFloat("Sphere Mass", &SPHERE_MASS, 1.0f, minSphmass, maxSphmass, "%.1f");
-		ImGui::DragFloat("Sphere Position X", &SPHERE_POS.x, 1.0f, minSphposX, maxSphposX, "%.1f");
-		ImGui::DragFloat("Sphere Position Y", &SPHERE_POS.y, 1.0f, minSphposY, maxSphposY, "%.1f");
-		ImGui::DragFloat("Sphere Position Z", &SPHERE_POS.z, 1.0f, minSphposZ, maxSphposZ, "%.1f");
-		ImGui::DragFloat("Sphere Radius", &SPHERE_RAD, 0.1f, minSphrad, maxSphrad, "%.1f");
+		ImGui::DragFloat("Sphere Mass", &SPHERE_MASS, 1.0f, minSphmass, maxSphmass, "%.3f");
+		ImGui::DragFloat("Sphere X", &SPHERE_POS.x, 0.1f, minSphposX, maxSphposX, "%.3f");
+		ImGui::DragFloat("Sphere Y", &SPHERE_POS.y, 0.1 ,minSphposY, maxSphposY, "%.3f");
+		ImGui::DragFloat("Sphere Z", &SPHERE_POS.z, 0.1f, minSphposZ, maxSphposZ, "%.3f");
+		ImGui::DragFloat("Sphere Radius", &SPHERE_RAD, 0.05f, minSphrad, maxSphrad, "%.3f");
 		//Capsule
 		//Use Capsule Collider
 		ImGui::Checkbox("Capsule Collision", &CAPSULE_COLLISION);
-		ImGui::DragFloat("Capsule Pos A", &CAPSULE_POS_A.x, 0.1f, minCapposA_X, maxCapposA_X, "%.1f");
-		ImGui::DragFloat("Capsule Pos A", &CAPSULE_POS_A.y, 0.1f, minCapposA_Y, maxCapposA_Y, "%.1f");
-		ImGui::DragFloat("Capsule Pos A", &CAPSULE_POS_A.z, 0.1f, minCapposA_Z, maxCapposA_Z, "%.1f");
-		ImGui::DragFloat("Capsule Pos B", &CAPSULE_POS_B.x, 0.1f, minCapposB_X, maxCapposB_X, "%.1f");
-		ImGui::DragFloat("Capsule Pos B", &CAPSULE_POS_B.y, 0.1f, minCapposB_Y, maxCapposB_Y, "%.1f");
-		ImGui::DragFloat("Capsule Pos B", &CAPSULE_POS_B.z, 0.1f, minCapposB_Z, maxCapposB_Z, "%.1f");
-		ImGui::DragFloat("Capsule Radius", &CAPSULE_RAD, 0.1f, minCaprad, maxCaprad, "%.1f");
+		ImGui::DragFloat("Capsule A X", &CAPSULE_POS_A.x, 0.1f, minCapposA_X, maxCapposA_X, "%.3f");
+		ImGui::DragFloat("Capsule A Y", &CAPSULE_POS_A.y, 0.1f, minCapposA_Y, maxCapposA_Y, "%.3f");
+		ImGui::DragFloat("Capsule A Z", &CAPSULE_POS_A.z, 0.1f, minCapposA_Z, maxCapposA_Z, "%.3f");
+		ImGui::DragFloat("Capsule B X", &CAPSULE_POS_B.x, 0.1f, minCapposB_X, maxCapposB_X, "%.3f");
+		ImGui::DragFloat("Capsule B Y", &CAPSULE_POS_B.y, 0.1f, minCapposB_Y, maxCapposB_Y, "%.3f");
+		ImGui::DragFloat("Capsule B Z", &CAPSULE_POS_B.z, 0.1f, minCapposB_Z, maxCapposB_Z, "%.3f");
+		ImGui::DragFloat("Capsule Radius", &CAPSULE_RAD, 0.05f, minCaprad, maxCaprad, "%.3f");
 
 		ImGui::Text("Forces");
 		//Use Gravity
 		ImGui::Checkbox("Activate Gravity", &PLAYING);
-		ImGui::DragFloat("Gravity Accel", &GRAVITY_FORCE, 1.0f, minGrabAccel, maxGrabAccel, "%.1f");
+		ImGui::DragFloat("Gravity Accel", &GRAVITY_FORCE, 0.1f, minGrabAccel, maxGrabAccel, "%.3f");
 	}
 	// .........................
 
@@ -332,9 +337,9 @@ void euler(float dt, ParticleSystem& particles, const std::vector<Collider*>& co
 	for (int i = 0; i < PARTICLE_COUNT; i++) {
 		glm::vec3 forces;
 		for (int j = 0; j < force_acts.size(); j++) {
-			forces += force_acts[j]->computeForce(GLOBAL_PARTICLE_MASS, particles.particlePositions[i]);
+			forces += force_acts[j]->computeForce(PARTICLE_MASS, particles.particlePositions[i]);
 		}
-		glm::vec3 accel = glm::vec3(forces.x / GLOBAL_PARTICLE_MASS, forces.y / GLOBAL_PARTICLE_MASS, forces.z / GLOBAL_PARTICLE_MASS);
+		glm::vec3 accel = glm::vec3(forces.x / PARTICLE_MASS, forces.y / PARTICLE_MASS, forces.z / PARTICLE_MASS);
 		particles.particleVelocities[i] += (dt * accel);
 		particles.particlePositions[i] += (dt * particles.particleVelocities[i]);
 
