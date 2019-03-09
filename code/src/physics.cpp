@@ -10,7 +10,9 @@ static bool SPHERE_COLLISION = true;
 static bool CAPSULE_COLLISION = true;
 //Velocitat i Activacio del funcionament
 static bool PLAYING = false;
-static float TIME_FACTOR = 0.2f;
+static bool GRAVITY_ACTIVE = true;
+static bool POSITIONAL_GRAVITY_ACTIVE = true;
+static float TIME_FACTOR = 1.0f;
 //Masa de les particules
 static float PARTICLE_MASS = 1.f;
 // Factors de gravetat
@@ -30,10 +32,10 @@ static float CAPSULE_RAD = 1.f;
 
 //defines pel GUI
 #define minPmass 1.0
-#define maxPmass 10.0
+#define maxPmass 100.0
 
 #define minSphmass 1.0
-#define maxSphmass 10.0
+#define maxSphmass 100.0
 
 #define minSphposX -5.0
 #define maxSphposX 5.0
@@ -52,12 +54,12 @@ static float CAPSULE_RAD = 1.f;
 #define minCapposA_Z 0.0
 #define maxCapposA_Z 10.0
 
-#define minCapposB_X 0.0
-#define maxCapposB_X 10.0
+#define minCapposB_X -5.0
+#define maxCapposB_X 5.0
 #define minCapposB_Y 0.0
 #define maxCapposB_Y 10.0
-#define minCapposB_Z 0.0
-#define maxCapposB_Z 10.0
+#define minCapposB_Z -5.0
+#define maxCapposB_Z 5.0
 
 #define minCaprad 0.1
 #define maxCaprad 5.0
@@ -154,11 +156,11 @@ void GUI() {
 
 		//PLAYING simulation
 		ImGui::Checkbox("Play/Pause the Simulation", &PLAYING);
-		ImGui::DragFloat("Speed", &TIME_FACTOR, 0.1f, 0.1f, 1.0f, "%.3f");
-		if (ImGui::Button("Reset the Simulation", ImVec2(50, 20))) { //Trobar i reactivar la funcio que inicia la simulacio
+		ImGui::DragFloat("Time Scale", &TIME_FACTOR, 0.01f, 0.1f, 1.0f, "%.3f");
+		if (ImGui::Button("Reset", ImVec2(50, 20))) { //Trobar i reactivar la funcio que inicia la simulacio
 			PhysicsRestart();
 		}
-		ImGui::DragFloat("Particle Mass", &PARTICLE_MASS, 0.05f, minPmass, maxPmass, "%.3f");
+		ImGui::DragFloat("Particles Mass", &PARTICLE_MASS, 0.05f, minPmass, maxPmass, "%.3f");
 
 		//Elasticitat i Friccio Particules
 		ImGui::Text("Elasticity & Friction");
@@ -168,27 +170,30 @@ void GUI() {
 		ImGui::Text("Colliders");
 		//Sphere
 		//Use Sphere Collider
+		ImGui::Text("Sphere");
 		ImGui::Checkbox("Sphere Collision", &SPHERE_COLLISION);
-		ImGui::DragFloat("Sphere Mass", &SPHERE_MASS, 1.0f, minSphmass, maxSphmass, "%.3f");
-		ImGui::DragFloat("Sphere X", &SPHERE_POS.x, 0.1f, minSphposX, maxSphposX, "%.3f");
-		ImGui::DragFloat("Sphere Y", &SPHERE_POS.y, 0.1 ,minSphposY, maxSphposY, "%.3f");
-		ImGui::DragFloat("Sphere Z", &SPHERE_POS.z, 0.1f, minSphposZ, maxSphposZ, "%.3f");
+		ImGui::DragFloat("Mass", &SPHERE_MASS, 1.0f, minSphmass, maxSphmass, "%.3f");
+		ImGui::DragFloat("X", &SPHERE_POS.x, 0.1f, minSphposX, maxSphposX, "%.3f");
+		ImGui::DragFloat("Y", &SPHERE_POS.y, 0.1 ,minSphposY, maxSphposY, "%.3f");
+		ImGui::DragFloat("Z", &SPHERE_POS.z, 0.1f, minSphposZ, maxSphposZ, "%.3f");
 		ImGui::DragFloat("Sphere Radius", &SPHERE_RAD, 0.05f, minSphrad, maxSphrad, "%.3f");
 		//Capsule
 		//Use Capsule Collider
+		ImGui::Text("Capsule");
 		ImGui::Checkbox("Capsule Collision", &CAPSULE_COLLISION);
-		ImGui::DragFloat("Capsule A X", &CAPSULE_POS_A.x, 0.1f, minCapposA_X, maxCapposA_X, "%.3f");
-		ImGui::DragFloat("Capsule A Y", &CAPSULE_POS_A.y, 0.1f, minCapposA_Y, maxCapposA_Y, "%.3f");
-		ImGui::DragFloat("Capsule A Z", &CAPSULE_POS_A.z, 0.1f, minCapposA_Z, maxCapposA_Z, "%.3f");
-		ImGui::DragFloat("Capsule B X", &CAPSULE_POS_B.x, 0.1f, minCapposB_X, maxCapposB_X, "%.3f");
-		ImGui::DragFloat("Capsule B Y", &CAPSULE_POS_B.y, 0.1f, minCapposB_Y, maxCapposB_Y, "%.3f");
-		ImGui::DragFloat("Capsule B Z", &CAPSULE_POS_B.z, 0.1f, minCapposB_Z, maxCapposB_Z, "%.3f");
+		ImGui::DragFloat("X 1", &CAPSULE_POS_A.x, 0.1f, minCapposA_X, maxCapposA_X, "%.3f");
+		ImGui::DragFloat("Y 1", &CAPSULE_POS_A.y, 0.1f, minCapposA_Y, maxCapposA_Y, "%.3f");
+		ImGui::DragFloat("Z 1", &CAPSULE_POS_A.z, 0.1f, minCapposA_Z, maxCapposA_Z, "%.3f");
+		ImGui::DragFloat("X 2", &CAPSULE_POS_B.x, 0.1f, minCapposB_X, maxCapposB_X, "%.3f");
+		ImGui::DragFloat("Y 2", &CAPSULE_POS_B.y, 0.1f, minCapposB_Y, maxCapposB_Y, "%.3f");
+		ImGui::DragFloat("Z 2", &CAPSULE_POS_B.z, 0.1f, minCapposB_Z, maxCapposB_Z, "%.3f");
 		ImGui::DragFloat("Capsule Radius", &CAPSULE_RAD, 0.05f, minCaprad, maxCaprad, "%.3f");
 
 		ImGui::Text("Forces");
 		//Use Gravity
-		ImGui::Checkbox("Activate Gravity", &PLAYING);
-		ImGui::DragFloat("Gravity Accel", &GRAVITY_FORCE, 0.1f, minGrabAccel, maxGrabAccel, "%.3f");
+		ImGui::Checkbox("Global Gravity", &GRAVITY_ACTIVE);
+		ImGui::DragFloat("Gravity Value", &GRAVITY_FORCE, 0.1f, minGrabAccel, maxGrabAccel, "%.3f");
+		ImGui::Checkbox("Positional Gravity Sphere", &POSITIONAL_GRAVITY_ACTIVE);
 	}
 	// .........................
 
@@ -215,7 +220,8 @@ struct ForceActuator {
 
 struct GravityForce : ForceActuator {
 	glm::vec3 computeForce(float mass, const glm::vec3& position) override {
-		return GRAVITY_VECTOR * (mass * GRAVITY_FORCE);
+		if(GRAVITY_ACTIVE) return GRAVITY_VECTOR * (mass * GRAVITY_FORCE);
+		else return glm::vec3(0);
 	}
 };
 
@@ -228,7 +234,8 @@ struct PositionalGravityForce : ForceActuator {
 	}
 
 	glm::vec3 computeForce(float _mass, const glm::vec3& _position) override {
-		return ((GRAVITY_FORCE * _mass * *mass) / glm::pow(Magnitude(_position, *position), 2)) * (*position - _position) / Magnitude(_position, *position);
+		if(POSITIONAL_GRAVITY_ACTIVE) return ((GRAVITY_FORCE * _mass * *mass) / glm::pow(Magnitude(_position, *position), 2)) * (*position - _position) / Magnitude(_position, *position);
+		else return glm::vec3(0);
 	}
 };
 // ------------------------------------------------------------------------------------------
