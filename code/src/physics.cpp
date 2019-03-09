@@ -220,8 +220,15 @@ struct GravityForce : ForceActuator {
 };
 
 struct PositionalGravityForce : ForceActuator {
-	glm::vec3 computeForce(float mass, const glm::vec3& position) override {
+	float *mass;
+	glm::vec3 *position;
+	PositionalGravityForce(float *_mass, glm::vec3 *_pos) {
+		position = _pos;
+		mass = _mass;
+	}
 
+	glm::vec3 computeForce(float _mass, const glm::vec3& _position) override {
+		return ((GRAVITY_FORCE * _mass * *mass) / glm::pow(Magnitude(_position, *position), 2)) * (*position - _position) / Magnitude(_position, *position);
 	}
 };
 // ------------------------------------------------------------------------------------------
@@ -372,6 +379,7 @@ void PhysicsInit() {
 	}
 
 	forces.push_back(new GravityForce());
+	forces.push_back(new PositionalGravityForce(&SPHERE_MASS, &SPHERE_POS));
 
 	colliders.push_back(new PlaneCol(glm::vec3(0, 0, 0), glm::vec3(0, -1, 0)));
 	colliders.push_back(new PlaneCol(glm::vec3(0, 10, 0), glm::vec3(0, 1, 0)));
@@ -424,7 +432,7 @@ void PhysicsCleanup() {
 	// ............................
 }
 
-float Magnitude(glm::vec3 a, glm::vec3 b) {
-	glm::vec3 x = b - a;
+float Magnitude(glm::vec3 from, glm::vec3 to) {
+	glm::vec3 x = to - from;
 	return glm::sqrt(glm::pow(x.x, 2) + glm::pow(x.y, 2) + glm::pow(x.z, 2));
 }
