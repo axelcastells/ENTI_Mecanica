@@ -63,12 +63,12 @@ static float CAPSULE_RAD = 1.f;
 #define maxCaprad 5.0
 
 #define minGrabAccel 0.0
-#define maxGrabAccel 0.15
+#define maxGrabAccel 9.81f
 #pragma endregion
 
 #pragma region Program
 
-void PhysicsInit();
+void PhysicsRestart();
 
 
 namespace Box {
@@ -156,7 +156,7 @@ void GUI() {
 		ImGui::Checkbox("Play/Pause the Simulation", &PLAYING);
 		ImGui::DragFloat("Speed", &TIME_FACTOR, 0.1f, 0.1f, 1.0f, "%.3f");
 		if (ImGui::Button("Reset the Simulation", ImVec2(50, 20))) { //Trobar i reactivar la funcio que inicia la simulacio
-			PhysicsInit();
+			PhysicsRestart();
 		}
 		ImGui::DragFloat("Particle Mass", &PARTICLE_MASS, 0.05f, minPmass, maxPmass, "%.3f");
 
@@ -287,7 +287,7 @@ struct SphereCol : Collider {
 		float magnitude = glm::sqrt(glm::pow(vector.x, 2) + glm::pow(vector.y, 2) + glm::pow(vector.z, 2));
 		float distance = glm::abs(magnitude);
 		
-		if (distance <= *radius) {
+		if (distance <= *radius && SPHERE_COLLISION) {
 			collisionPoint = next_pos;
 			return true;
 		}
@@ -322,7 +322,7 @@ struct CapsuleCol : Collider {
 
 		float distance = Magnitude(next_pos, colPos) - *radius;
 
-		if (distance <= 0) {
+		if (distance <= 0 && CAPSULE_COLLISION) {
 			collisionPoint = next_pos;
 			return true;
 		}
@@ -364,12 +364,11 @@ void PhysicsInit() {
 			Tools::Map(Tools::Random(), 0, 1, 5, 10), 
 			Tools::Map(Tools::Random(), 0, 1, -5, 5));
 
-		//glm::vec3 newVel(
-		//	Tools::Random() * 5,
-		//	Tools::Random() * 5,
-		//	Tools::Random() * 5);
-
-		ps->SetParticle(i, newPos, glm::vec3(0));
+		glm::vec3 newVel(
+			-5 + Tools::Random() * 10,
+			-5 + Tools::Random() * 10,
+			-5 + Tools::Random() * 10);
+		ps->SetParticle(i, newPos, newVel);
 	}
 
 	forces.push_back(new GravityForce());
@@ -398,6 +397,25 @@ void PhysicsUpdate(float dt) {
 	Sphere::updateSphere(SPHERE_POS, SPHERE_RAD);
 	Capsule::updateCapsule(CAPSULE_POS_A, CAPSULE_POS_B, CAPSULE_RAD);
 	// ...........................
+}
+
+void PhysicsRestart() {
+	delete(ps);
+	ps = new ParticleSystem();
+	for (int i = 0; i < PARTICLE_COUNT; i++) {
+		float f = Tools::Random();
+		glm::vec3 newPos(
+			Tools::Map(Tools::Random(), 0, 1, -5, 5),
+			Tools::Map(Tools::Random(), 0, 1, 5, 10),
+			Tools::Map(Tools::Random(), 0, 1, -5, 5));
+
+		glm::vec3 newVel(
+			-5 + Tools::Random() * 10,
+			-5 + Tools::Random() * 10,
+			-5 + Tools::Random() * 10);
+
+		ps->SetParticle(i, newPos, newVel);
+	}
 }
 
 void PhysicsCleanup() {
