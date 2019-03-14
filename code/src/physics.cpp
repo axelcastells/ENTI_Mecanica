@@ -72,6 +72,7 @@ static float CAPSULE_RAD = 1.f;
 #pragma region Program
 
 void PhysicsRestart();
+FiberSystem fs = FiberSystem();
 
 
 namespace Box {
@@ -117,7 +118,7 @@ bool renderSphere = true;
 bool renderCapsule = true;
 bool renderParticles = true;
 bool renderMesh = false;
-bool renderFiber = false;
+bool renderFiber = true;
 bool renderCube = false;
 
 //You may have to change this code
@@ -140,7 +141,14 @@ void renderPrims() {
 	if (renderMesh)
 		Mesh::drawMesh();
 	if (renderFiber)
-		Fiber::drawFiber();
+	{
+		for (int i = 0; i < fs.FibersCount(); i++) {
+			Fiber::updateFiber(fs[i].DataPtr());
+			Fiber::drawFiber();
+		}
+		
+	}
+		
 
 	if (renderCube)
 		Cube::drawCube();
@@ -375,10 +383,9 @@ void euler(float dt, ParticleSystem& particles, const std::vector<Collider*>& co
 }
 
 void verlet(float dt, FiberStraw& fiber, const std::vector<Collider*>& colliders, const std::vector<ForceActuator*>& force_acts) {
-	for (int i = 0; i < MAX_FIBERSTRAWS; i++) {
-
-	}
+	
 }
+
 
 ParticleSystem* ps = new ParticleSystem();
 std::vector<ForceActuator*> forces;
@@ -398,6 +405,15 @@ void PhysicsInit() {
 			-5 + Tools::Random() * 10,
 			-5 + Tools::Random() * 10);
 		ps->SetParticle(i, newPos, newVel);
+	}
+
+	for (int i = 0; i < fs.FibersCount(); i++) {
+		glm::vec3 newPos(
+			Tools::Map(Tools::Random(), 0, 1, -5, 5),
+			0,
+			Tools::Map(Tools::Random(), 0, 1, -5, 5));
+		
+		fs.SetFiber(i, FiberStraw(newPos, Fiber::numVerts, .3f));
 	}
 
 	forces.push_back(new GravityForce());
@@ -422,6 +438,9 @@ void PhysicsUpdate(float dt) {
 		euler(dt * TIME_FACTOR, *ps, colliders, forces);
 
 		Particles::updateParticles(0, MAX_PARTICLES, ps->ParticlesPtr());
+
+
+		
 	}
 
 	Sphere::updateSphere(SPHERE_POS, SPHERE_RAD);
