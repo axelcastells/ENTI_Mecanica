@@ -2,6 +2,7 @@
 #include <imgui\imgui_impl_sdl_gl3.h>
 #include <glm\gtc\matrix_transform.hpp>
 #include "ParticleSystem.h"
+#include "FiberStraw.h"
 #include "Tools.h"
 
 #pragma region GlobalData
@@ -132,7 +133,7 @@ void renderPrims() {
 
 	if (renderParticles) {
 		int startDrawingFromParticle = 0;
-		int numParticlesToDraw = PARTICLE_COUNT;// Particles::maxParticles;
+		int numParticlesToDraw = MAX_PARTICLES;// Particles::maxParticles;
 		Particles::drawParticles(startDrawingFromParticle, numParticlesToDraw);
 	}
 
@@ -347,8 +348,16 @@ struct CapsuleCol : Collider {
 	}
 };
 
+glm::vec3 computeForces(FiberStraw& fiber, int idx, const std::vector<ForceActuator*>& force_acts) {
+	return glm::vec3();
+}
+
+glm::vec3 springforce(const glm::vec3& P1, const glm::vec3& V1, const glm::vec3& P2, const glm::vec3& V2, float L0, float ke, float kd) {
+	return glm::vec3();
+}
+
 void euler(float dt, ParticleSystem& particles, const std::vector<Collider*>& colliders, const std::vector<ForceActuator*>& force_acts) {
-	for (int i = 0; i < PARTICLE_COUNT; i++) {
+	for (int i = 0; i < MAX_PARTICLES; i++) {
 		glm::vec3 forces;
 		for (int j = 0; j < force_acts.size(); j++) {
 			forces += force_acts[j]->computeForce(PARTICLE_MASS, particles.particlePositions[i]);
@@ -365,13 +374,19 @@ void euler(float dt, ParticleSystem& particles, const std::vector<Collider*>& co
 	}
 }
 
+void verlet(float dt, FiberStraw& fiber, const std::vector<Collider*>& colliders, const std::vector<ForceActuator*>& force_acts) {
+	for (int i = 0; i < MAX_FIBERSTRAWS; i++) {
+
+	}
+}
+
 ParticleSystem* ps = new ParticleSystem();
 std::vector<ForceActuator*> forces;
 std::vector<Collider*> colliders;
 
 void PhysicsInit() {
 	// Do your initialization code here...
-	for (int i = 0; i < PARTICLE_COUNT; i++) {
+	for (int i = 0; i < MAX_PARTICLES; i++) {
 		float f = Tools::Random();
 		glm::vec3 newPos(
 			Tools::Map(Tools::Random(), 0, 1, -5, 5), 
@@ -406,7 +421,7 @@ void PhysicsUpdate(float dt) {
 	if (PLAYING) {
 		euler(dt * TIME_FACTOR, *ps, colliders, forces);
 
-		Particles::updateParticles(0, PARTICLE_COUNT, ps->ParticlesPtr());
+		Particles::updateParticles(0, MAX_PARTICLES, ps->ParticlesPtr());
 	}
 
 	Sphere::updateSphere(SPHERE_POS, SPHERE_RAD);
@@ -417,7 +432,7 @@ void PhysicsUpdate(float dt) {
 void PhysicsRestart() {
 	delete(ps);
 	ps = new ParticleSystem();
-	for (int i = 0; i < PARTICLE_COUNT; i++) {
+	for (int i = 0; i < MAX_PARTICLES; i++) {
 		float f = Tools::Random();
 		glm::vec3 newPos(
 			Tools::Map(Tools::Random(), 0, 1, -5, 5),
