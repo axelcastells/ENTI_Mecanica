@@ -10,7 +10,7 @@
 static bool SPHERE_COLLISION = true;
 static bool CAPSULE_COLLISION = true;
 //Velocitat i Activacio del funcionament
-static bool PLAYING = false;
+static bool SIMULATE_PARTICLES = false;
 static bool GRAVITY_ACTIVE = true;
 static bool POSITIONAL_GRAVITY_ACTIVE = true;
 static float TIME_FACTOR = 1.0f;
@@ -23,8 +23,11 @@ static glm::vec3 GRAVITY_VECTOR = { 0,-1,0 };
 static float BOUNCE_ELASTICITY = 0.8f;
 static float FRICTION_FACTOR = .2f;
 //Factors Esfera
-static glm::vec3 SPHERE_POS = { 1,5,0 };
+static glm::vec3 SPHERE_POS = { 0,5,0 };
 static float SPHERE_RAD = 1.5f;
+static glm::vec3 SPHERE_ORBITAL_POINT = { 0,0,0 };
+static float SPHERE_ORBITAL_MAGNITUDE = 2.f;
+static float SPHERE_ORBITAL_SPEED = 4.f;
 static float SPHERE_MASS = 1.f;
 //Factors Capsula
 static glm::vec3 CAPSULE_POS_A = { -2,1,1 };
@@ -115,7 +118,7 @@ namespace Cube {
 
 // Boolean variables allow to show/hide the primitives
 bool renderSphere = true;
-bool renderCapsule = true;
+bool renderCapsule = false;
 bool renderParticles = true;
 bool renderMesh = false;
 bool renderFiber = true;
@@ -164,7 +167,7 @@ void GUI() {
 		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
 
 		//PLAYING simulation
-		ImGui::Checkbox("Play/Pause the Simulation", &PLAYING);
+		ImGui::Checkbox("Play/Pause the Simulation", &SIMULATE_PARTICLES);
 		ImGui::DragFloat("Time Scale", &TIME_FACTOR, 0.01f, 0.1f, 1.0f, "%.3f");
 		if (ImGui::Button("Reset", ImVec2(50, 20))) { //Trobar i reactivar la funcio que inicia la simulacio
 			PhysicsRestart();
@@ -434,7 +437,7 @@ void PhysicsInit() {
 
 void PhysicsUpdate(float dt) {
 	// Do your update code here...
-	if (PLAYING) {
+	if (SIMULATE_PARTICLES) {
 		euler(dt * TIME_FACTOR, *ps, colliders, forces);
 
 		Particles::updateParticles(0, MAX_PARTICLES, ps->ParticlesPtr());
@@ -442,6 +445,17 @@ void PhysicsUpdate(float dt) {
 
 		
 	}
+
+	static float counter = .0f;
+	counter += dt;
+	if (counter >= 2*glm::pi<float>()) {
+		counter = 0;
+	}
+
+
+	SPHERE_POS.x = SPHERE_ORBITAL_POINT.x - (glm::cos(counter * SPHERE_ORBITAL_SPEED) * SPHERE_ORBITAL_MAGNITUDE);
+	SPHERE_POS.z = SPHERE_ORBITAL_POINT.z - (glm::sin(counter * SPHERE_ORBITAL_SPEED) * SPHERE_ORBITAL_MAGNITUDE);
+
 
 	Sphere::updateSphere(SPHERE_POS, SPHERE_RAD);
 	Capsule::updateCapsule(CAPSULE_POS_A, CAPSULE_POS_B, CAPSULE_RAD);
