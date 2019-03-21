@@ -14,7 +14,9 @@ public:
 			positions[i] = glm::vec3(pos.x, pos.y + (distance*i), pos.z);
 		}
 	}
-	
+	float GetCount() {
+		return jointsCount;
+	}
 	float* DataPtr() {
 		return &positions[0].x;
 	}
