@@ -10,11 +10,13 @@
 static bool SPHERE_COLLISION = true;
 static bool CAPSULE_COLLISION = true;
 //Velocitat i Activacio del funcionament
+static bool SIMULATE_FIBERS = true;
 static bool SIMULATE_PARTICLES = false;
 static bool GRAVITY_ACTIVE = true;
 static bool POSITIONAL_GRAVITY_ACTIVE = true;
 static float TIME_FACTOR = 1.0f;
 //Masa de les particules
+static float FIBER_MASS = 1.f;
 static float PARTICLE_MASS = 1.f;
 // Factors de gravetat
 static float GRAVITY_FORCE = 9.81f;
@@ -360,11 +362,32 @@ struct CapsuleCol : Collider {
 };
 
 glm::vec3 computeForces(FiberStraw& fiber, int idx, const std::vector<ForceActuator*>& force_acts) {
-	return glm::vec3();
+	glm::vec3 forces;
+	for (int i = 0; i < force_acts.size(); i++) {
+		forces += force_acts[i]->computeForce(FIBER_MASS, fiber.positions[idx]);
+	}
+
+	for (int i = 0; i < fiber.GetCount(); i++) {
+		for (int j = 0; j < fiber.GetCount(); j++) {
+			//forces += springforce(fiber.positions[i], fiber.positions)
+		}
+	}
+
+	return forces;
 }
 
 glm::vec3 springforce(const glm::vec3& P1, const glm::vec3& V1, const glm::vec3& P2, const glm::vec3& V2, float L0, float ke, float kd) {
-	return glm::vec3();
+	return -(ke*(Magnitude(P2, P1) - L0) + kd * (V1 - V2) * (P1 - P2 / Magnitude(P2, P1))) * (P1 - P2 / Magnitude(P2, P1));
+}
+
+
+void verlet(float dt, FiberStraw& fiber, const std::vector<Collider*>& colliders, const std::vector<ForceActuator*>& force_acts) {
+	for (int i = 0; i < fiber.GetCount(); i++) {
+		glm::vec3 forces = computeForces(fiber, i, force_acts);
+
+
+
+	}
 }
 
 void euler(float dt, ParticleSystem& particles, const std::vector<Collider*>& colliders, const std::vector<ForceActuator*>& force_acts) {
@@ -384,11 +407,6 @@ void euler(float dt, ParticleSystem& particles, const std::vector<Collider*>& co
 
 	}
 }
-
-void verlet(float dt, FiberStraw& fiber, const std::vector<Collider*>& colliders, const std::vector<ForceActuator*>& force_acts) {
-	
-}
-
 
 ParticleSystem* ps = new ParticleSystem();
 std::vector<ForceActuator*> forces;
@@ -445,6 +463,16 @@ void PhysicsUpdate(float dt) {
 
 		
 	}
+
+	if (SIMULATE_FIBERS) {
+
+		for (int i = 0; i < fs.FibersCount(); i++) {
+			verlet(dt * TIME_FACTOR, fs[i], colliders, forces);
+
+		}
+	}
+	
+
 
 	static float counter = .0f;
 	counter += dt;
