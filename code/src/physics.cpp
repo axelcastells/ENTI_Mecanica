@@ -311,10 +311,54 @@ struct SphereCol : Collider {
 	bool checkCollision(const glm::vec3& prev_pos, const glm::vec3& next_pos) override {
 		glm::vec3 vector = next_pos - *position;
 		float magnitude = glm::sqrt(glm::pow(vector.x, 2) + glm::pow(vector.y, 2) + glm::pow(vector.z, 2));
-		float distance = glm::abs(magnitude);
+		float distance_to_center = glm::abs(magnitude);
 		
-		if (distance <= *radius && SPHERE_COLLISION) {
-			collisionPoint = next_pos;
+		if (distance_to_center <= *radius && SPHERE_COLLISION) {
+			// equacio de 2n grau | Q = next_pos | P = prev_pos | C = centre de la esfera
+			// a = Q*Q + P*P - 2*Q*P
+			float a = (next_pos.x * next_pos.x + next_pos.y * next_pos.y + next_pos.z * next_pos.z) 					// Q*Q
+						+ (prev_pos.x * prev_pos.x + prev_pos.y * prev_pos.y + prev_pos.z * prev_pos.z)					// + P*P
+						- 2 * (prev_pos.x * next_pos.x + prev_pos.y * next_pos.y + prev_pos.z * next_pos.z);			// - 2*Q*P
+			// b = P*Q + P*P - C*Q + C*P
+			float b = (prev_pos.x * next_pos.x + prev_pos.y * next_pos.y + prev_pos.z *next_pos.z)						// P*Q
+						+ (prev_pos.x * prev_pos.x + prev_pos.y * prev_pos.y + prev_pos.z * prev_pos.z)					// + P*P
+						- ((*position).x * next_pos.x + (*position).y * next_pos.y + (*position).z * next_pos.z)		// - C*Q
+						+ ((*position).x * prev_pos.x + (*position).y * prev_pos.y + (*position).z * prev_pos.z);		// + C*P
+			// c = C*C + P*P - r^2 - 2*C*P
+			float c = ((*position).x * (*position).x + (*position).y * (*position).y + (*position).z * (*position).z)	// C*C
+						+ (prev_pos.x * prev_pos.x + prev_pos.y * prev_pos.y + prev_pos.z * prev_pos.z)					// + P*P
+						- (*radius * *radius)																			// - radius^2
+						- 2 * ((*position).x * prev_pos.x + (*position).y * prev_pos.y + (*position).z * prev_pos.z);	// - 2*C*P
+						
+			//calculem alfa1 i alfa2 de la equació de 2n grau
+			float alfa1 = (- b + sqrt(b*b - 4*a*c)) / 2*a;
+			float alfa2 = (- b - sqrt(b*b - 4*a*c)) / 2*a;
+
+			//calculem el vector entre la prev_pos i next_pos
+			glm::vec3 vector_prev_next = next_pos - prev_pos;
+			glm::vec3 S1 = prev_pos + vector_prev_next * alfa1;		//S1 = Point of surface 1
+			glm::vec3 S2 = prev_pos + vector_prev_next * alfa2;		//S2 = Point of surface 2
+
+			//calculem el vector entre la prev_pos i els punts en superfície
+			glm::vec3 vector_prev_S1 = S1 - prev_pos;
+			glm::vec3 vector_prev_S2 = S2 - prev_pos;
+
+			//comprovem quina de les 2 alfas és la bona
+			float dist_prev_to_S1 = glm::sqrt(glm::pow(vector_prev_S1.x, 2) + glm::pow(vector_prev_S1.y, 2) + glm::pow(vector_prev_S1.z, 2));
+			float dist_prev_to_S2 = glm::sqrt(glm::pow(vector_prev_S2.x, 2) + glm::pow(vector_prev_S2.y, 2) + glm::pow(vector_prev_S2.z, 2));;
+			if (dist_prev_to_S1 < dist_prev_to_S2) {
+				//S1 és el punt de col·lisio que ens interessa
+				collisionPoint = S1;
+			}
+			else if (dist_prev_to_S1 > dist_prev_to_S2) {
+				//S2 és el punt de col·lisio que ens interessa
+				collisionPoint = S2;
+			}
+			else {
+				//impossible
+			}
+
+
 			return true;
 		}
 		return false;
