@@ -261,18 +261,25 @@ struct Collider {
 	void computeCollision(const glm::vec3& old_pos, const glm::vec3& old_vel, glm::vec3& new_pos, glm::vec3& new_vel) 
 	{
 		if (checkCollision(old_pos, new_pos)) {
+
+
 			glm::vec3 normal;
 			float d;
 			getPlane(normal, d);
-			
-			new_pos = old_pos - (1 + BOUNCE_ELASTICITY) * (glm::dot(normal, old_pos) + d) * normal;
-			new_vel = old_vel - (1 + BOUNCE_ELASTICITY) * glm::dot(normal, old_vel) * normal;
 
+
+
+			//XOC PLA - PARTÍCULA | ELASTICITAT
+			glm::vec3 pos_rebot = new_pos - (1 + BOUNCE_ELASTICITY) * (glm::dot(normal, new_pos) + d) * normal;
+			glm::vec3 vel_rebot = new_vel - (1 + BOUNCE_ELASTICITY) * glm::dot(normal, new_vel) * normal;
+
+
+			//XOC PLA - PARTÍCULA | FRICCIÓ
 			glm::vec3 nVel, tVel;
 			nVel = glm::dot(normal, old_vel) * normal;
 			tVel = old_vel - nVel;
 
-			new_vel = old_vel - (FRICTION_FACTOR * tVel);
+			vel_rebot = vel_rebot - (FRICTION_FACTOR * tVel);
 		}
 	}
 };
@@ -311,26 +318,17 @@ struct SphereCol : Collider {
 	}
 	
 	bool checkCollision(const glm::vec3& prev_pos, const glm::vec3& next_pos) override {
-		glm::vec3 vector = next_pos - *position;
-		float magnitude = glm::sqrt(glm::pow(vector.x, 2) + glm::pow(vector.y, 2) + glm::pow(vector.z, 2));
-		float distance_to_center = glm::abs(magnitude);
+
+		float distance_to_center = distance(next_pos,*position);
 		
 		if (distance_to_center <= *radius && SPHERE_COLLISION) {
 			// equacio de 2n grau | Q = next_pos | P = prev_pos | C = centre de la esfera
 			// a = Q*Q + P*P - 2*Q*P
-			float a = (next_pos.x * next_pos.x + next_pos.y * next_pos.y + next_pos.z * next_pos.z) 					// Q*Q
-						+ (prev_pos.x * prev_pos.x + prev_pos.y * prev_pos.y + prev_pos.z * prev_pos.z)					// + P*P
-						- 2 * (prev_pos.x * next_pos.x + prev_pos.y * next_pos.y + prev_pos.z * next_pos.z);			// - 2*Q*P
-			// b = P*Q + P*P - C*Q + C*P
-			float b = (prev_pos.x * next_pos.x + prev_pos.y * next_pos.y + prev_pos.z *next_pos.z)						// P*Q
-						+ (prev_pos.x * prev_pos.x + prev_pos.y * prev_pos.y + prev_pos.z * prev_pos.z)					// + P*P
-						- ((*position).x * next_pos.x + (*position).y * next_pos.y + (*position).z * next_pos.z)		// - C*Q
-						+ ((*position).x * prev_pos.x + (*position).y * prev_pos.y + (*position).z * prev_pos.z);		// + C*P
+			float a = glm::dot(next_pos, next_pos) + glm::dot(prev_pos, prev_pos) - 2 * glm::dot(next_pos, prev_pos);
+			// b = 2*(P*Q + P*P - C*Q + C*P)
+			float b = 2 * (glm::dot(prev_pos, next_pos) + glm::dot(prev_pos, prev_pos) - glm::dot(*position, next_pos) + glm::dot(*position,prev_pos));
 			// c = C*C + P*P - r^2 - 2*C*P
-			float c = ((*position).x * (*position).x + (*position).y * (*position).y + (*position).z * (*position).z)	// C*C
-						+ (prev_pos.x * prev_pos.x + prev_pos.y * prev_pos.y + prev_pos.z * prev_pos.z)					// + P*P
-						- (*radius * *radius)																			// - radius^2
-						- 2 * ((*position).x * prev_pos.x + (*position).y * prev_pos.y + (*position).z * prev_pos.z);	// - 2*C*P
+			float c = glm::dot(*position, *position) + glm::dot(prev_pos, prev_pos) - glm::pow(*radius,2) - 2 * glm::dot(*position,prev_pos);
 						
 			//calculem alfa1 i alfa2 de la equació de 2n grau
 			float alfa1 = (- b + sqrt(b*b - 4*a*c)) / 2*a;
@@ -341,34 +339,27 @@ struct SphereCol : Collider {
 			glm::vec3 S1 = prev_pos + vector_prev_next * alfa1;		//S1 = Point of surface 1
 			glm::vec3 S2 = prev_pos + vector_prev_next * alfa2;		//S2 = Point of surface 2
 
-			//calculem el vector entre la prev_pos i els punts en superfície
-			glm::vec3 vector_prev_S1 = S1 - prev_pos;
-			glm::vec3 vector_prev_S2 = S2 - prev_pos;
+			float dist_to_S1 = distance(prev_pos,S1);
+			float dist_to_S2 = distance(prev_pos,S2);
 
-			//comprovem quina de les 2 alfas és la bona
-			float dist_prev_to_S1 = glm::sqrt(glm::pow(vector_prev_S1.x, 2) + glm::pow(vector_prev_S1.y, 2) + glm::pow(vector_prev_S1.z, 2));
-			float dist_prev_to_S2 = glm::sqrt(glm::pow(vector_prev_S2.x, 2) + glm::pow(vector_prev_S2.y, 2) + glm::pow(vector_prev_S2.z, 2));;
-			if (dist_prev_to_S1 < dist_prev_to_S2) {
+			if (dist_to_S1 < dist_to_S2) {
 				//S1 és el punt de col·lisio que ens interessa
 				collisionPoint = S1;
 			}
-			else if (dist_prev_to_S1 > dist_prev_to_S2) {
+			else if (dist_to_S1 > dist_to_S2) {
 				//S2 és el punt de col·lisio que ens interessa
 				collisionPoint = S2;
 			}
 			else {
 				//impossible
 			}
-
-
 			return true;
 		}
 		return false;
 	}
 	void getPlane(glm::vec3& normal, float& d) override {
 		normal = collisionPoint - *position;
-		float mag = glm::sqrt(glm::pow(normal.x, 2) + glm::pow(normal.y, 2) + glm::pow(normal.z, 2));
-		normal = normal / mag;
+		normal = normalize(normal);
 		d = glm::dot(-normal, collisionPoint);
 	}
 };
@@ -441,13 +432,16 @@ void euler(float dt, ParticleSystem& particles, const std::vector<Collider*>& co
 			forces += force_acts[j]->computeForce(PARTICLE_MASS, particles.particlePositions[i]);
 		}
 		glm::vec3 accel = glm::vec3(forces.x / PARTICLE_MASS, forces.y / PARTICLE_MASS, forces.z / PARTICLE_MASS);
-		particles.particleVelocities[i] += (dt * accel);
-		particles.particlePositions[i] += (dt * particles.particleVelocities[i]);
+		
+		glm::vec3 particle_new_velocity = particles.particleVelocities[i] + (dt * accel);
+		glm::vec3 particle_new_position = particles.particlePositions[i] + (dt * particles.particleVelocities[i]);
+
 
 		for (int j = 0; j < colliders.size(); j++) {
-			colliders[j]->computeCollision(particles.particlePositions[i], particles.particleVelocities[i], 
-											particles.particlePositions[i], particles.particleVelocities[i]);
+			colliders[j]->computeCollision(particles.particlePositions[i], particles.particleVelocities[i], algo, algo);
 		}
+
+		particles.particlePositions[i] += particles.particleVelocities;
 
 	}
 }
