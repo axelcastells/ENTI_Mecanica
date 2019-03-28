@@ -12,6 +12,8 @@ public:
 
 		for (int i = 0; i < MAX_JOINTS_PER_FIBBER; i++) {
 			positions[i] = glm::vec3(pos.x, pos.y + (distance*i), pos.z);
+			prevPositions[i] = positions[i];
+			velocities[i] = glm::vec3(0);
 		}
 	}
 	float GetCount() {
@@ -20,11 +22,13 @@ public:
 	float* DataPtr() {
 		return &positions[0].x;
 	}
+	
+	float distance;
 	glm::vec3 positions[MAX_JOINTS_PER_FIBBER];
-	//glm::vec3 velocities[MAX_JOINTS_PER_FIBBER];
+	glm::vec3 prevPositions[MAX_JOINTS_PER_FIBBER];
+	glm::vec3 velocities[MAX_JOINTS_PER_FIBBER];
 private:
 	int jointsCount;
-	float distance;
 };
 
 struct FiberSystem {

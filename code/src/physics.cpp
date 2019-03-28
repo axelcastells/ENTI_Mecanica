@@ -4,19 +4,21 @@
 #include "ParticleSystem.h"
 #include "FiberStraw.h"
 #include "Tools.h"
+#include "glm/gtx/intersect.hpp"
+#include <iostream>
 
 #pragma region GlobalData
 //Colisions
 static bool SPHERE_COLLISION = true;
 static bool CAPSULE_COLLISION = true;
 //Velocitat i Activacio del funcionament
-static bool SIMULATE_FIBERS = true;
+static bool SIMULATE_FIBERS = false;
 static bool SIMULATE_PARTICLES = false;
 static bool GRAVITY_ACTIVE = true;
 static bool POSITIONAL_GRAVITY_ACTIVE = true;
 static float TIME_FACTOR = 1.0f;
 //Masa de les particules
-static float FIBER_MASS = 1.f;
+static float FIBER_PARTICLE_MASS = 1.f;
 static float PARTICLE_MASS = 1.f;
 // Factors de gravetat
 static float GRAVITY_FORCE = 9.81f;
@@ -24,6 +26,9 @@ static glm::vec3 GRAVITY_VECTOR = { 0,-1,0 };
 //Friccio i Elasticitat
 static float BOUNCE_ELASTICITY = 0.8f;
 static float FRICTION_FACTOR = .2f;
+
+static float FIBER_ELASTICITY = 0.0f;
+static float FIBER_DAMPLING = 0.f;
 //Factors Esfera
 static glm::vec3 SPHERE_POS = { 0,5,0 };
 static float SPHERE_RAD = 1.5f;
@@ -169,7 +174,8 @@ void GUI() {
 		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
 
 		//PLAYING simulation
-		ImGui::Checkbox("Play/Pause the Simulation", &SIMULATE_PARTICLES);
+		//ImGui::Checkbox("Play/Pause Particles", &SIMULATE_PARTICLES);
+		ImGui::Checkbox("Play/Pause Fibers", &SIMULATE_FIBERS);
 		ImGui::DragFloat("Time Scale", &TIME_FACTOR, 0.01f, 0.1f, 1.0f, "%.3f");
 		if (ImGui::Button("Reset", ImVec2(50, 20))) { //Trobar i reactivar la funcio que inicia la simulacio
 			PhysicsRestart();
@@ -258,6 +264,10 @@ struct PositionalGravityForce : ForceActuator {
 struct Collider {
 	virtual bool checkCollision(const glm::vec3& prev_pos, const glm::vec3& next_pos) = 0; 
 	virtual void getPlane(glm::vec3& normal, float& d) = 0; 
+	void computeCollision(glm::vec3& old_pos, glm::vec3& new_pos) 
+	{
+
+	}
 	void computeCollision(const glm::vec3& old_pos, const glm::vec3& old_vel, glm::vec3& new_pos, glm::vec3& new_vel) 
 	{
 		if (checkCollision(old_pos, new_pos)) {
@@ -280,6 +290,9 @@ struct Collider {
 			tVel = old_vel - nVel;
 
 			vel_rebot = vel_rebot - (FRICTION_FACTOR * tVel);
+
+			new_pos = pos_rebot;
+			new_vel = vel_rebot;
 		}
 	}
 };
@@ -339,16 +352,27 @@ struct SphereCol : Collider {
 			glm::vec3 S1 = prev_pos + vector_prev_next * alfa1;		//S1 = Point of surface 1
 			glm::vec3 S2 = prev_pos + vector_prev_next * alfa2;		//S2 = Point of surface 2
 
-			float dist_to_S1 = distance(prev_pos,S1);
-			float dist_to_S2 = distance(prev_pos,S2);
+			//float dist_to_S1 = distance(prev_pos,S1);
+			//float dist_to_S2 = distance(prev_pos,S2);
+			
+			
+			glm::vec3 newPos1, newNorm1, newPos2, newNorm2;
+			if (!glm::intersectLineSphere<glm::vec3>(prev_pos, next_pos, *position, *radius, newPos1, newNorm1, newPos2, newNorm2)) {
+				std::cout << "Couldn't compute line - sphere collision" << std::endl;
+			}
+
+			float dist_to_S1 = distance(prev_pos, newPos1);
+			float dist_to_S2 = distance(prev_pos, newPos2);
+			//std::cout << "Punts Raw: (" << S1.x << " " << S1.y<< " " << S1.z << ") : (" << S2.x << " " << S2.y << " " << S2.z <<")"<< std::endl;
+			//std::cout << "Punts Pro: (" << newPos1.x << " " << newPos1.y << " " << newPos1.z << ") : (" << newPos2.x << " " << newPos2.y << " " << newPos2.z <<")"<< std::endl;
 
 			if (dist_to_S1 < dist_to_S2) {
 				//S1 és el punt de col·lisio que ens interessa
-				collisionPoint = S1;
+				collisionPoint = newPos1;
 			}
 			else if (dist_to_S1 > dist_to_S2) {
 				//S2 és el punt de col·lisio que ens interessa
-				collisionPoint = S2;
+				collisionPoint = newPos2;
 			}
 			else {
 				//impossible
@@ -359,7 +383,7 @@ struct SphereCol : Collider {
 	}
 	void getPlane(glm::vec3& normal, float& d) override {
 		normal = collisionPoint - *position;
-		normal = normalize(normal);
+		normal = glm::normalize(normal);
 		d = glm::dot(-normal, collisionPoint);
 	}
 };
@@ -396,33 +420,52 @@ struct CapsuleCol : Collider {
 	}
 };
 
+glm::vec3 springforce(const glm::vec3& P1, const glm::vec3& V1, const glm::vec3& P2, const glm::vec3& V2, float L0, float ke, float kd) {
+	return -(ke*(glm::distance(P1, P2) - L0) + kd * glm::dot((V1 - V2), (P1 - P2 / glm::distance(P1, P2)))) * (P1 - P2 / glm::distance(P1, P2));
+}
+
 glm::vec3 computeForces(FiberStraw& fiber, int idx, const std::vector<ForceActuator*>& force_acts) {
 	glm::vec3 forces;
 	for (int i = 0; i < force_acts.size(); i++) {
-		forces += force_acts[i]->computeForce(FIBER_MASS, fiber.positions[idx]);
+		forces += force_acts[i]->computeForce(FIBER_PARTICLE_MASS, fiber.positions[idx]);
+
 	}
 
-	for (int i = 0; i < fiber.GetCount(); i++) {
-		for (int j = 0; j < fiber.GetCount(); j++) {
-			//forces += springforce(fiber.positions[i], fiber.positions)
+	// Spring Forces
+	if (idx - 1 >= 0) {
+		forces += springforce(fiber.positions[idx], fiber.velocities[idx], fiber.positions[idx - 1], fiber.velocities[idx - 1], fiber.distance, FIBER_ELASTICITY, FIBER_DAMPLING);
+		if (idx - 2 >= 0) {
+			forces += springforce(fiber.positions[idx], fiber.velocities[idx], fiber.positions[idx - 2], fiber.velocities[idx - 2], fiber.distance*2, FIBER_ELASTICITY, FIBER_DAMPLING);
 		}
 	}
-
+	if (idx + 1 <= fiber.GetCount() - 1) {
+		forces += springforce(fiber.positions[idx], fiber.velocities[idx], fiber.positions[idx + 1], fiber.velocities[idx + 1], fiber.distance, FIBER_ELASTICITY, FIBER_DAMPLING);
+		if (idx + 2 <= fiber.GetCount() - 1) {
+			forces += springforce(fiber.positions[idx], fiber.velocities[idx], fiber.positions[idx + 2], fiber.velocities[idx + 2], fiber.distance*2, FIBER_ELASTICITY, FIBER_DAMPLING);
+		}
+	}
 	return forces;
 }
 
-glm::vec3 springforce(const glm::vec3& P1, const glm::vec3& V1, const glm::vec3& P2, const glm::vec3& V2, float L0, float ke, float kd) {
-	return -(ke*(Magnitude(P2, P1) - L0) + kd * (V1 - V2) * (P1 - P2 / Magnitude(P2, P1))) * (P1 - P2 / Magnitude(P2, P1));
-}
 
 
 void verlet(float dt, FiberStraw& fiber, const std::vector<Collider*>& colliders, const std::vector<ForceActuator*>& force_acts) {
-	for (int i = 0; i < fiber.GetCount(); i++) {
+	for (int i = 1; i < fiber.GetCount(); i++) {
 		glm::vec3 forces = computeForces(fiber, i, force_acts);
 
+		glm::vec3 newPos = fiber.positions[i] + (fiber.positions[i] - fiber.prevPositions[i]) + forces / FIBER_PARTICLE_MASS * dt*dt;
+		glm::vec3 newVel = (newPos - fiber.positions[i]) / dt;
 
+		// COLLISIONS
+		for (int j = 0; j < colliders.size(); j++) {
+			colliders[j]->computeCollision(fiber.positions[i], newPos);
+		}
 
+		fiber.positions[i] = newPos;
+		fiber.velocities[i] = newVel;
 	}
+
+	
 }
 
 void euler(float dt, ParticleSystem& particles, const std::vector<Collider*>& colliders, const std::vector<ForceActuator*>& force_acts) {
@@ -433,15 +476,16 @@ void euler(float dt, ParticleSystem& particles, const std::vector<Collider*>& co
 		}
 		glm::vec3 accel = glm::vec3(forces.x / PARTICLE_MASS, forces.y / PARTICLE_MASS, forces.z / PARTICLE_MASS);
 		
-		glm::vec3 particle_new_velocity = particles.particleVelocities[i] + (dt * accel);
-		glm::vec3 particle_new_position = particles.particlePositions[i] + (dt * particles.particleVelocities[i]);
+		glm::vec3 particle_new_velocity = glm::vec3(particles.particleVelocities[i] + (dt * accel));
+		glm::vec3 particle_new_position = glm::vec3(particles.particlePositions[i] + (dt * particles.particleVelocities[i]));
 
 
 		for (int j = 0; j < colliders.size(); j++) {
-			colliders[j]->computeCollision(particles.particlePositions[i], particles.particleVelocities[i], algo, algo);
+			colliders[j]->computeCollision(particles.particlePositions[i], particles.particleVelocities[i], particle_new_position, particle_new_velocity);
 		}
 
-		particles.particlePositions[i] += particles.particleVelocities;
+		particles.particlePositions[i] = particle_new_position;
+		particles.particleVelocities[i] = particle_new_velocity;
 
 	}
 }
@@ -513,7 +557,7 @@ void PhysicsUpdate(float dt) {
 
 
 	static float counter = .0f;
-	counter += dt;
+	counter += dt * TIME_FACTOR;
 	if (counter >= 2*glm::pi<float>()) {
 		counter = 0;
 	}
