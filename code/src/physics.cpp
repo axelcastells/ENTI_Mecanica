@@ -615,6 +615,16 @@ void PhysicsRestart() {
 
 		ps->SetParticle(i, newPos, newVel);
 	}
+
+	fs = FiberSystem();
+	for (int i = 0; i < fs.FibersCount(); i++) {
+		glm::vec3 newPos(
+			Tools::Map(Tools::Random(), 0, 1, -5, 5),
+			0,
+			Tools::Map(Tools::Random(), 0, 1, -5, 5));
+
+		fs.SetFiber(i, FiberStraw(newPos, Fiber::numVerts, .3f));
+	}
 }
 
 void PhysicsCleanup() {
