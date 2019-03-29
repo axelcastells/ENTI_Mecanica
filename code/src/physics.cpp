@@ -41,12 +41,40 @@ static glm::vec3 CAPSULE_POS_A = { -2,1,1 };
 static glm::vec3 CAPSULE_POS_B = { 2,1,1 };
 static float CAPSULE_RAD = 1.f;
 
+//Stats 
+static float STRETCH = 0.0;
+static float BEND = 0.0;
+static float PLD = 0.0;
+
+//Moviment esfera
+static float SPHERE_TURN = 0.0;
+static float SPHERE_SPEED = 0.0;
+
+//Vent
+static bool WIND_ACTIVE = false;
+static float WIND_FORCE = 0.0;
+
 //defines pel GUI
 #define minPmass 1.0
 #define maxPmass 100.0
 
+#define minStretch 5
+#define maxStretch 1000
+
 #define minSphmass 1.0
 #define maxSphmass 100.0
+
+#define minBend 5
+#define maxBend 1000
+
+#define minPLD 0.1
+#define maxPLD 1.0
+
+#define Sphturnmin 0.1
+#define Sphturnmax 5.0
+
+#define Sphspeedmin 0.1
+#define Sphspeedmax 2.0
 
 #define minSphposX -5.0
 #define maxSphposX 5.0
@@ -77,6 +105,9 @@ static float CAPSULE_RAD = 1.f;
 
 #define minGrabAccel 0.0
 #define maxGrabAccel 9.81f
+
+#define minWindAccel 0.0
+#define maxWindAccel 10.0
 #pragma endregion
 
 #pragma region Program
@@ -175,14 +206,20 @@ void GUI() {
 
 		//PLAYING simulation
 		//ImGui::Checkbox("Play/Pause Particles", &SIMULATE_PARTICLES);
-		ImGui::Checkbox("Play/Pause Fibers", &SIMULATE_FIBERS);
+		ImGui::Checkbox("Play/Pause Simulation", &SIMULATE_FIBERS);
 		ImGui::DragFloat("Time Scale", &TIME_FACTOR, 0.01f, 0.1f, 1.0f, "%.3f");
 		if (ImGui::Button("Reset", ImVec2(50, 20))) { //Trobar i reactivar la funcio que inicia la simulacio
 			PhysicsRestart();
 		}
-		ImGui::DragFloat("Particles Mass", &PARTICLE_MASS, 0.05f, minPmass, maxPmass, "%.3f");
+		//ImGui::DragFloat("Particles Mass", &PARTICLE_MASS, 0.05f, minPmass, maxPmass, "%.3f");
 
-		//Elasticitat i Friccio Particules
+		//Spring Parameters
+		ImGui::Text("Spring Parameters");
+		ImGui::DragFloat("Stretch", &STRETCH, 0.05f, minStretch, maxStretch, "%.3f");
+		ImGui::DragFloat("Bend", &BEND, 0.05f, minBend, maxBend, "%.3f");
+		ImGui::DragFloat("Particle Link Distance", &PLD, 0.05f, minPLD, maxPLD, "%.3f");
+
+		//Elasticitat i Friccio Fibres
 		ImGui::Text("Elasticity & Friction");
 		ImGui::DragFloat("Elasticity", &BOUNCE_ELASTICITY, 0.05f, 0.0f, 1.0f, "%.3f");
 		ImGui::DragFloat("Friction", &FRICTION_FACTOR, 0.05f, 0.0f, 1.0f, "%.3f");
@@ -192,28 +229,17 @@ void GUI() {
 		//Use Sphere Collider
 		ImGui::Text("Sphere");
 		ImGui::Checkbox("Sphere Collision", &SPHERE_COLLISION);
-		ImGui::DragFloat("Mass", &SPHERE_MASS, 1.0f, minSphmass, maxSphmass, "%.3f");
-		ImGui::DragFloat("X", &SPHERE_POS.x, 0.1f, minSphposX, maxSphposX, "%.3f");
-		ImGui::DragFloat("Y", &SPHERE_POS.y, 0.1 ,minSphposY, maxSphposY, "%.3f");
-		ImGui::DragFloat("Z", &SPHERE_POS.z, 0.1f, minSphposZ, maxSphposZ, "%.3f");
+		ImGui::DragFloat("Sphere Y", &SPHERE_POS.y, 0.1, minSphposY, maxSphposY, "%.3f");
+		ImGui::DragFloat("Sphere Turm Radius", &SPHERE_TURN, 0.1, Sphturnmin, Sphturnmax, "%.3f");
+		ImGui::DragFloat("Sphere Turn Speed", &SPHERE_SPEED, 0.1, Sphspeedmin, Sphspeedmax, "%.3f");
 		ImGui::DragFloat("Sphere Radius", &SPHERE_RAD, 0.05f, minSphrad, maxSphrad, "%.3f");
-		//Capsule
-		//Use Capsule Collider
-		ImGui::Text("Capsule");
-		ImGui::Checkbox("Capsule Collision", &CAPSULE_COLLISION);
-		ImGui::DragFloat("X 1", &CAPSULE_POS_A.x, 0.1f, minCapposA_X, maxCapposA_X, "%.3f");
-		ImGui::DragFloat("Y 1", &CAPSULE_POS_A.y, 0.1f, minCapposA_Y, maxCapposA_Y, "%.3f");
-		ImGui::DragFloat("Z 1", &CAPSULE_POS_A.z, 0.1f, minCapposA_Z, maxCapposA_Z, "%.3f");
-		ImGui::DragFloat("X 2", &CAPSULE_POS_B.x, 0.1f, minCapposB_X, maxCapposB_X, "%.3f");
-		ImGui::DragFloat("Y 2", &CAPSULE_POS_B.y, 0.1f, minCapposB_Y, maxCapposB_Y, "%.3f");
-		ImGui::DragFloat("Z 2", &CAPSULE_POS_B.z, 0.1f, minCapposB_Z, maxCapposB_Z, "%.3f");
-		ImGui::DragFloat("Capsule Radius", &CAPSULE_RAD, 0.05f, minCaprad, maxCaprad, "%.3f");
 
 		ImGui::Text("Forces");
 		//Use Gravity
-		ImGui::Checkbox("Global Gravity", &GRAVITY_ACTIVE);
-		ImGui::DragFloat("Gravity Value", &GRAVITY_FORCE, 0.1f, minGrabAccel, maxGrabAccel, "%.3f");
-		ImGui::Checkbox("Positional Gravity Sphere", &POSITIONAL_GRAVITY_ACTIVE);
+		ImGui::Checkbox("Use Gravity", &GRAVITY_ACTIVE);
+		ImGui::DragFloat("Gravity Accel", &GRAVITY_FORCE, 0.1f, minGrabAccel, maxGrabAccel, "%.3f");
+		ImGui::Checkbox("Use Wind", &WIND_ACTIVE);
+		ImGui::DragFloat("Wind Accel", &WIND_FORCE, 0.1f, minWindAccel, maxWindAccel, "%.3f");
 	}
 	// .........................
 
