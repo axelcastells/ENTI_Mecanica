@@ -46,10 +46,6 @@ static float STRETCH = 0.0;
 static float BEND = 0.0;
 static float PLD = 0.0;
 
-//Moviment esfera
-static float SPHERE_TURN = 0.0;
-static float SPHERE_SPEED = 0.0;
-
 //Vent
 static bool WIND_ACTIVE = false;
 static float WIND_FORCE = 0.0;
@@ -230,8 +226,8 @@ void GUI() {
 		ImGui::Text("Sphere");
 		ImGui::Checkbox("Sphere Collision", &SPHERE_COLLISION);
 		ImGui::DragFloat("Sphere Y", &SPHERE_POS.y, 0.1, minSphposY, maxSphposY, "%.3f");
-		ImGui::DragFloat("Sphere Turm Radius", &SPHERE_TURN, 0.1, Sphturnmin, Sphturnmax, "%.3f");
-		ImGui::DragFloat("Sphere Turn Speed", &SPHERE_SPEED, 0.1, Sphspeedmin, Sphspeedmax, "%.3f");
+		ImGui::DragFloat("Sphere Turm Radius", &SPHERE_ORBITAL_MAGNITUDE, 0.1, Sphturnmin, Sphturnmax, "%.3f");
+		ImGui::DragFloat("Sphere Turn Speed", &SPHERE_ORBITAL_SPEED, 0.1, Sphspeedmin, Sphspeedmax, "%.3f");
 		ImGui::DragFloat("Sphere Radius", &SPHERE_RAD, 0.05f, minSphrad, maxSphrad, "%.3f");
 
 		ImGui::Text("Forces");
@@ -583,14 +579,14 @@ void PhysicsUpdate(float dt) {
 
 
 	static float counter = .0f;
-	counter += dt * TIME_FACTOR;
+	counter += dt * SPHERE_ORBITAL_SPEED * TIME_FACTOR;
 	if (counter >= 2*glm::pi<float>()) {
 		counter = 0;
 	}
 
 
-	SPHERE_POS.x = SPHERE_ORBITAL_POINT.x - (glm::cos(counter * SPHERE_ORBITAL_SPEED) * SPHERE_ORBITAL_MAGNITUDE);
-	SPHERE_POS.z = SPHERE_ORBITAL_POINT.z - (glm::sin(counter * SPHERE_ORBITAL_SPEED) * SPHERE_ORBITAL_MAGNITUDE);
+	SPHERE_POS.x = SPHERE_ORBITAL_POINT.x - (glm::cos(counter) * SPHERE_ORBITAL_MAGNITUDE);
+	SPHERE_POS.z = SPHERE_ORBITAL_POINT.z - (glm::sin(counter) * SPHERE_ORBITAL_MAGNITUDE);
 
 
 	Sphere::updateSphere(SPHERE_POS, SPHERE_RAD);
