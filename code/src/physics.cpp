@@ -28,7 +28,7 @@ static float BOUNCE_ELASTICITY = 0.8f;
 static float FRICTION_FACTOR = .2f;
 
 static float FIBER_ELASTICITY = 0.0f;
-static float FIBER_DAMPLING = 0.f;
+static float FIBER_DAMPLING = 0.0f;
 //Factors Esfera
 static glm::vec3 SPHERE_POS = { 0,5,0 };
 static float SPHERE_RAD = 1.5f;
@@ -41,10 +41,8 @@ static glm::vec3 CAPSULE_POS_A = { -2,1,1 };
 static glm::vec3 CAPSULE_POS_B = { 2,1,1 };
 static float CAPSULE_RAD = 1.f;
 
-//Stats 
-static float STRETCH = 0.0;
-static float BEND = 0.0;
-static float PLD = 0.0;
+//Fibres
+static float FIBER_LENGTH = .3f;
 
 //Vent
 static bool WIND_ACTIVE = false;
@@ -54,14 +52,14 @@ static float WIND_FORCE = 0.0;
 #define minPmass 1.0
 #define maxPmass 100.0
 
-#define minStretch 5
-#define maxStretch 1000
+#define minStretch 0
+#define maxStretch 1
 
 #define minSphmass 1.0
 #define maxSphmass 100.0
 
-#define minBend 5
-#define maxBend 1000
+#define minBend 0
+#define maxBend 1
 
 #define minPLD 0.1
 #define maxPLD 1.0
@@ -211,9 +209,9 @@ void GUI() {
 
 		//Spring Parameters
 		ImGui::Text("Spring Parameters");
-		ImGui::DragFloat("Stretch", &STRETCH, 0.05f, minStretch, maxStretch, "%.3f");
-		ImGui::DragFloat("Bend", &BEND, 0.05f, minBend, maxBend, "%.3f");
-		ImGui::DragFloat("Particle Link Distance", &PLD, 0.05f, minPLD, maxPLD, "%.3f");
+		ImGui::DragFloat("Stretch", &FIBER_ELASTICITY, 0.05f, minStretch, maxStretch, "%.3f");
+		ImGui::DragFloat("Bend", &FIBER_DAMPLING, 0.05f, minBend, maxBend, "%.3f");
+		ImGui::DragFloat("Particle Link Distance", &FIBER_LENGTH, 0.05f, minPLD, maxPLD, "%.3f");
 
 		//Elasticitat i Friccio Fibres
 		ImGui::Text("Elasticity & Friction");
@@ -457,13 +455,13 @@ glm::vec3 computeForces(FiberStraw& fiber, int idx, const std::vector<ForceActua
 	if (idx - 1 >= 0) {
 		forces += springforce(fiber.positions[idx], fiber.velocities[idx], fiber.positions[idx - 1], fiber.velocities[idx - 1], fiber.distance, FIBER_ELASTICITY, FIBER_DAMPLING);
 		if (idx - 2 >= 0) {
-			forces += springforce(fiber.positions[idx], fiber.velocities[idx], fiber.positions[idx - 2], fiber.velocities[idx - 2], fiber.distance*2, FIBER_ELASTICITY, FIBER_DAMPLING);
+			forces += springforce(fiber.positions[idx], fiber.velocities[idx], fiber.positions[idx - 2], fiber.velocities[idx - 2], fiber.distance * 2, FIBER_ELASTICITY, FIBER_DAMPLING);
 		}
 	}
 	if (idx + 1 <= fiber.GetCount() - 1) {
 		forces += springforce(fiber.positions[idx], fiber.velocities[idx], fiber.positions[idx + 1], fiber.velocities[idx + 1], fiber.distance, FIBER_ELASTICITY, FIBER_DAMPLING);
 		if (idx + 2 <= fiber.GetCount() - 1) {
-			forces += springforce(fiber.positions[idx], fiber.velocities[idx], fiber.positions[idx + 2], fiber.velocities[idx + 2], fiber.distance*2, FIBER_ELASTICITY, FIBER_DAMPLING);
+			forces += springforce(fiber.positions[idx], fiber.velocities[idx], fiber.positions[idx + 2], fiber.velocities[idx + 2], fiber.distance * 2, FIBER_ELASTICITY, FIBER_DAMPLING);
 		}
 	}
 	return forces;
@@ -538,7 +536,7 @@ void PhysicsInit() {
 			0,
 			Tools::Map(Tools::Random(), 0, 1, -5, 5));
 		
-		fs.SetFiber(i, FiberStraw(newPos, Fiber::numVerts, .3f));
+		fs.SetFiber(i, FiberStraw(newPos, Fiber::numVerts, FIBER_LENGTH));
 	}
 
 	forces.push_back(new GravityForce());
@@ -619,7 +617,7 @@ void PhysicsRestart() {
 			0,
 			Tools::Map(Tools::Random(), 0, 1, -5, 5));
 
-		fs.SetFiber(i, FiberStraw(newPos, Fiber::numVerts, .3f));
+		fs.SetFiber(i, FiberStraw(newPos, Fiber::numVerts, FIBER_LENGTH));
 	}
 }
 
