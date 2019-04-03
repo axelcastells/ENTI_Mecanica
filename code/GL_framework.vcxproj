@@ -139,12 +139,19 @@ xcopy "$(ProjectDir)libs\SDL2.dll" "$(OutDir)" /y /d</Command>
     <ClCompile Include="include\imgui\imgui_impl_sdl_gl3.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\physics.cpp" />
+    <ClCompile Include="src\Quaternion.cpp" />
     <ClCompile Include="src\render.cpp" />
+    <ClCompile Include="src\Vector.cpp" />
+    <ClCompile Include="src\VMath.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\AxisAngle.h" />
     <ClInclude Include="src\FiberStraw.h" />
     <ClInclude Include="src\ParticleSystem.h" />
+    <ClInclude Include="src\Quaternion.h" />
     <ClInclude Include="src\Tools.h" />
+    <ClInclude Include="src\Vector.h" />
+    <ClInclude Include="src\VMath.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
