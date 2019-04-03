@@ -1,9 +1,7 @@
 #pragma once
-#include "Particle.h"
 #include <vector>
 
-#define PARTICLE_COUNT 5000
-#define GLOBAL_PARTICLE_MASS 1
+#define MAX_PARTICLES 5000
 
 class ParticleSystem {
 public:
@@ -28,8 +26,8 @@ public:
 		return &particlePositions[0].x;
 	}
 
-	glm::vec3 particlePositions[PARTICLE_COUNT];
-	glm::vec3 particleVelocities[PARTICLE_COUNT];
+	glm::vec3 particlePositions[MAX_PARTICLES];
+	glm::vec3 particleVelocities[MAX_PARTICLES];
 private:
 
 };

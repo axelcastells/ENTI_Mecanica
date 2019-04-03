@@ -2,18 +2,23 @@
 #include <imgui\imgui_impl_sdl_gl3.h>
 #include <glm\gtc\matrix_transform.hpp>
 #include "ParticleSystem.h"
+#include "FiberStraw.h"
 #include "Tools.h"
+#include "glm/gtx/intersect.hpp"
+#include <iostream>
 
 #pragma region GlobalData
 //Colisions
 static bool SPHERE_COLLISION = true;
 static bool CAPSULE_COLLISION = true;
 //Velocitat i Activacio del funcionament
-static bool PLAYING = false;
+static bool SIMULATE_FIBERS = false;
+static bool SIMULATE_PARTICLES = false;
 static bool GRAVITY_ACTIVE = true;
 static bool POSITIONAL_GRAVITY_ACTIVE = true;
 static float TIME_FACTOR = 1.0f;
 //Masa de les particules
+static float FIBER_PARTICLE_MASS = 1.f;
 static float PARTICLE_MASS = 1.f;
 // Factors de gravetat
 static float GRAVITY_FORCE = 9.81f;
@@ -21,21 +26,49 @@ static glm::vec3 GRAVITY_VECTOR = { 0,-1,0 };
 //Friccio i Elasticitat
 static float BOUNCE_ELASTICITY = 0.8f;
 static float FRICTION_FACTOR = .2f;
+
+static float FIBER_ELASTICITY = 0.0f;
+static float FIBER_DAMPLING = 0.0f;
 //Factors Esfera
-static glm::vec3 SPHERE_POS = { 1,5,0 };
+static glm::vec3 SPHERE_POS = { 0,5,0 };
 static float SPHERE_RAD = 1.5f;
+static glm::vec3 SPHERE_ORBITAL_POINT = { 0,0,0 };
+static float SPHERE_ORBITAL_MAGNITUDE = 2.f;
+static float SPHERE_ORBITAL_SPEED = 4.f;
 static float SPHERE_MASS = 1.f;
 //Factors Capsula
 static glm::vec3 CAPSULE_POS_A = { -2,1,1 };
 static glm::vec3 CAPSULE_POS_B = { 2,1,1 };
 static float CAPSULE_RAD = 1.f;
 
+//Fibres
+static float FIBER_LENGTH = .3f;
+
+//Vent
+static bool WIND_ACTIVE = false;
+static float WIND_FORCE = 0.0;
+
 //defines pel GUI
 #define minPmass 1.0
 #define maxPmass 100.0
 
+#define minStretch 0
+#define maxStretch 1
+
 #define minSphmass 1.0
 #define maxSphmass 100.0
+
+#define minBend 0
+#define maxBend 1
+
+#define minPLD 0.1
+#define maxPLD 1.0
+
+#define Sphturnmin 0.1
+#define Sphturnmax 5.0
+
+#define Sphspeedmin 0.1
+#define Sphspeedmax 2.0
 
 #define minSphposX -5.0
 #define maxSphposX 5.0
@@ -66,11 +99,15 @@ static float CAPSULE_RAD = 1.f;
 
 #define minGrabAccel 0.0
 #define maxGrabAccel 9.81f
+
+#define minWindAccel 0.0
+#define maxWindAccel 10.0
 #pragma endregion
 
 #pragma region Program
 
 void PhysicsRestart();
+FiberSystem fs = FiberSystem();
 
 
 namespace Box {
@@ -113,10 +150,10 @@ namespace Cube {
 
 // Boolean variables allow to show/hide the primitives
 bool renderSphere = true;
-bool renderCapsule = true;
+bool renderCapsule = false;
 bool renderParticles = true;
 bool renderMesh = false;
-bool renderFiber = false;
+bool renderFiber = true;
 bool renderCube = false;
 
 //You may have to change this code
@@ -132,14 +169,21 @@ void renderPrims() {
 
 	if (renderParticles) {
 		int startDrawingFromParticle = 0;
-		int numParticlesToDraw = PARTICLE_COUNT;// Particles::maxParticles;
+		int numParticlesToDraw = MAX_PARTICLES;// Particles::maxParticles;
 		Particles::drawParticles(startDrawingFromParticle, numParticlesToDraw);
 	}
 
 	if (renderMesh)
 		Mesh::drawMesh();
 	if (renderFiber)
-		Fiber::drawFiber();
+	{
+		for (int i = 0; i < fs.FibersCount(); i++) {
+			Fiber::updateFiber(fs[i].DataPtr());
+			Fiber::drawFiber();
+		}
+		
+	}
+		
 
 	if (renderCube)
 		Cube::drawCube();
@@ -155,14 +199,21 @@ void GUI() {
 		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
 
 		//PLAYING simulation
-		ImGui::Checkbox("Play/Pause the Simulation", &PLAYING);
+		//ImGui::Checkbox("Play/Pause Particles", &SIMULATE_PARTICLES);
+		ImGui::Checkbox("Play/Pause Simulation", &SIMULATE_FIBERS);
 		ImGui::DragFloat("Time Scale", &TIME_FACTOR, 0.01f, 0.1f, 1.0f, "%.3f");
 		if (ImGui::Button("Reset", ImVec2(50, 20))) { //Trobar i reactivar la funcio que inicia la simulacio
 			PhysicsRestart();
 		}
-		ImGui::DragFloat("Particles Mass", &PARTICLE_MASS, 0.05f, minPmass, maxPmass, "%.3f");
+		//ImGui::DragFloat("Particles Mass", &PARTICLE_MASS, 0.05f, minPmass, maxPmass, "%.3f");
 
-		//Elasticitat i Friccio Particules
+		//Spring Parameters
+		ImGui::Text("Spring Parameters");
+		ImGui::DragFloat("Stretch", &FIBER_ELASTICITY, 0.05f, minStretch, maxStretch, "%.3f");
+		ImGui::DragFloat("Bend", &FIBER_DAMPLING, 0.05f, minBend, maxBend, "%.3f");
+		ImGui::DragFloat("Particle Link Distance", &FIBER_LENGTH, 0.05f, minPLD, maxPLD, "%.3f");
+
+		//Elasticitat i Friccio Fibres
 		ImGui::Text("Elasticity & Friction");
 		ImGui::DragFloat("Elasticity", &BOUNCE_ELASTICITY, 0.05f, 0.0f, 1.0f, "%.3f");
 		ImGui::DragFloat("Friction", &FRICTION_FACTOR, 0.05f, 0.0f, 1.0f, "%.3f");
@@ -172,28 +223,17 @@ void GUI() {
 		//Use Sphere Collider
 		ImGui::Text("Sphere");
 		ImGui::Checkbox("Sphere Collision", &SPHERE_COLLISION);
-		ImGui::DragFloat("Mass", &SPHERE_MASS, 1.0f, minSphmass, maxSphmass, "%.3f");
-		ImGui::DragFloat("X", &SPHERE_POS.x, 0.1f, minSphposX, maxSphposX, "%.3f");
-		ImGui::DragFloat("Y", &SPHERE_POS.y, 0.1 ,minSphposY, maxSphposY, "%.3f");
-		ImGui::DragFloat("Z", &SPHERE_POS.z, 0.1f, minSphposZ, maxSphposZ, "%.3f");
+		ImGui::DragFloat("Sphere Y", &SPHERE_POS.y, 0.1, minSphposY, maxSphposY, "%.3f");
+		ImGui::DragFloat("Sphere Turm Radius", &SPHERE_ORBITAL_MAGNITUDE, 0.1, Sphturnmin, Sphturnmax, "%.3f");
+		ImGui::DragFloat("Sphere Turn Speed", &SPHERE_ORBITAL_SPEED, 0.1, Sphspeedmin, Sphspeedmax, "%.3f");
 		ImGui::DragFloat("Sphere Radius", &SPHERE_RAD, 0.05f, minSphrad, maxSphrad, "%.3f");
-		//Capsule
-		//Use Capsule Collider
-		ImGui::Text("Capsule");
-		ImGui::Checkbox("Capsule Collision", &CAPSULE_COLLISION);
-		ImGui::DragFloat("X 1", &CAPSULE_POS_A.x, 0.1f, minCapposA_X, maxCapposA_X, "%.3f");
-		ImGui::DragFloat("Y 1", &CAPSULE_POS_A.y, 0.1f, minCapposA_Y, maxCapposA_Y, "%.3f");
-		ImGui::DragFloat("Z 1", &CAPSULE_POS_A.z, 0.1f, minCapposA_Z, maxCapposA_Z, "%.3f");
-		ImGui::DragFloat("X 2", &CAPSULE_POS_B.x, 0.1f, minCapposB_X, maxCapposB_X, "%.3f");
-		ImGui::DragFloat("Y 2", &CAPSULE_POS_B.y, 0.1f, minCapposB_Y, maxCapposB_Y, "%.3f");
-		ImGui::DragFloat("Z 2", &CAPSULE_POS_B.z, 0.1f, minCapposB_Z, maxCapposB_Z, "%.3f");
-		ImGui::DragFloat("Capsule Radius", &CAPSULE_RAD, 0.05f, minCaprad, maxCaprad, "%.3f");
 
 		ImGui::Text("Forces");
 		//Use Gravity
-		ImGui::Checkbox("Global Gravity", &GRAVITY_ACTIVE);
-		ImGui::DragFloat("Gravity Value", &GRAVITY_FORCE, 0.1f, minGrabAccel, maxGrabAccel, "%.3f");
-		ImGui::Checkbox("Positional Gravity Sphere", &POSITIONAL_GRAVITY_ACTIVE);
+		ImGui::Checkbox("Use Gravity", &GRAVITY_ACTIVE);
+		ImGui::DragFloat("Gravity Accel", &GRAVITY_FORCE, 0.1f, minGrabAccel, maxGrabAccel, "%.3f");
+		ImGui::Checkbox("Use Wind", &WIND_ACTIVE);
+		ImGui::DragFloat("Wind Accel", &WIND_FORCE, 0.1f, minWindAccel, maxWindAccel, "%.3f");
 	}
 	// .........................
 
@@ -244,21 +284,35 @@ struct PositionalGravityForce : ForceActuator {
 struct Collider {
 	virtual bool checkCollision(const glm::vec3& prev_pos, const glm::vec3& next_pos) = 0; 
 	virtual void getPlane(glm::vec3& normal, float& d) = 0; 
+	void computeCollision(glm::vec3& old_pos, glm::vec3& new_pos) 
+	{
+
+	}
 	void computeCollision(const glm::vec3& old_pos, const glm::vec3& old_vel, glm::vec3& new_pos, glm::vec3& new_vel) 
 	{
 		if (checkCollision(old_pos, new_pos)) {
+
+
 			glm::vec3 normal;
 			float d;
 			getPlane(normal, d);
-			
-			new_pos = old_pos - (1 + BOUNCE_ELASTICITY) * (glm::dot(normal, old_pos) + d) * normal;
-			new_vel = old_vel - (1 + BOUNCE_ELASTICITY) * glm::dot(normal, old_vel) * normal;
 
+
+
+			//XOC PLA - PARTÍCULA | ELASTICITAT
+			glm::vec3 pos_rebot = new_pos - (1 + BOUNCE_ELASTICITY) * (glm::dot(normal, new_pos) + d) * normal;
+			glm::vec3 vel_rebot = new_vel - (1 + BOUNCE_ELASTICITY) * glm::dot(normal, new_vel) * normal;
+
+
+			//XOC PLA - PARTÍCULA | FRICCIÓ
 			glm::vec3 nVel, tVel;
 			nVel = glm::dot(normal, old_vel) * normal;
 			tVel = old_vel - nVel;
 
-			new_vel = old_vel - (FRICTION_FACTOR * tVel);
+			vel_rebot = vel_rebot - (FRICTION_FACTOR * tVel);
+
+			new_pos = pos_rebot;
+			new_vel = vel_rebot;
 		}
 	}
 };
@@ -297,20 +351,59 @@ struct SphereCol : Collider {
 	}
 	
 	bool checkCollision(const glm::vec3& prev_pos, const glm::vec3& next_pos) override {
-		glm::vec3 vector = next_pos - *position;
-		float magnitude = glm::sqrt(glm::pow(vector.x, 2) + glm::pow(vector.y, 2) + glm::pow(vector.z, 2));
-		float distance = glm::abs(magnitude);
+
+		float distance_to_center = distance(next_pos,*position);
 		
-		if (distance <= *radius && SPHERE_COLLISION) {
-			collisionPoint = next_pos;
+		if (distance_to_center <= *radius && SPHERE_COLLISION) {
+			// equacio de 2n grau | Q = next_pos | P = prev_pos | C = centre de la esfera
+			// a = Q*Q + P*P - 2*Q*P
+			float a = glm::dot(next_pos, next_pos) + glm::dot(prev_pos, prev_pos) - 2 * glm::dot(next_pos, prev_pos);
+			// b = 2*(P*Q + P*P - C*Q + C*P)
+			float b = 2 * (glm::dot(prev_pos, next_pos) + glm::dot(prev_pos, prev_pos) - glm::dot(*position, next_pos) + glm::dot(*position,prev_pos));
+			// c = C*C + P*P - r^2 - 2*C*P
+			float c = glm::dot(*position, *position) + glm::dot(prev_pos, prev_pos) - glm::pow(*radius,2) - 2 * glm::dot(*position,prev_pos);
+						
+			//calculem alfa1 i alfa2 de la equació de 2n grau
+			float alfa1 = (- b + sqrt(b*b - 4*a*c)) / 2*a;
+			float alfa2 = (- b - sqrt(b*b - 4*a*c)) / 2*a;
+
+			//calculem el vector entre la prev_pos i next_pos
+			glm::vec3 vector_prev_next = next_pos - prev_pos;
+			glm::vec3 S1 = prev_pos + vector_prev_next * alfa1;		//S1 = Point of surface 1
+			glm::vec3 S2 = prev_pos + vector_prev_next * alfa2;		//S2 = Point of surface 2
+
+			//float dist_to_S1 = distance(prev_pos,S1);
+			//float dist_to_S2 = distance(prev_pos,S2);
+			
+			
+			glm::vec3 newPos1, newNorm1, newPos2, newNorm2;
+			if (!glm::intersectLineSphere<glm::vec3>(prev_pos, next_pos, *position, *radius, newPos1, newNorm1, newPos2, newNorm2)) {
+				std::cout << "Couldn't compute line - sphere collision" << std::endl;
+			}
+
+			float dist_to_S1 = distance(prev_pos, newPos1);
+			float dist_to_S2 = distance(prev_pos, newPos2);
+			//std::cout << "Punts Raw: (" << S1.x << " " << S1.y<< " " << S1.z << ") : (" << S2.x << " " << S2.y << " " << S2.z <<")"<< std::endl;
+			//std::cout << "Punts Pro: (" << newPos1.x << " " << newPos1.y << " " << newPos1.z << ") : (" << newPos2.x << " " << newPos2.y << " " << newPos2.z <<")"<< std::endl;
+
+			if (dist_to_S1 < dist_to_S2) {
+				//S1 és el punt de col·lisio que ens interessa
+				collisionPoint = newPos1;
+			}
+			else if (dist_to_S1 > dist_to_S2) {
+				//S2 és el punt de col·lisio que ens interessa
+				collisionPoint = newPos2;
+			}
+			else {
+				//impossible
+			}
 			return true;
 		}
 		return false;
 	}
 	void getPlane(glm::vec3& normal, float& d) override {
 		normal = collisionPoint - *position;
-		float mag = glm::sqrt(glm::pow(normal.x, 2) + glm::pow(normal.y, 2) + glm::pow(normal.z, 2));
-		normal = normal / mag;
+		normal = glm::normalize(normal);
 		d = glm::dot(-normal, collisionPoint);
 	}
 };
@@ -347,20 +440,72 @@ struct CapsuleCol : Collider {
 	}
 };
 
+glm::vec3 springforce(const glm::vec3& P1, const glm::vec3& V1, const glm::vec3& P2, const glm::vec3& V2, float L0, float ke, float kd) {
+	return -(ke*(glm::distance(P1, P2) - L0) + kd * glm::dot((V1 - V2), (P1 - P2 / glm::distance(P1, P2)))) * (P1 - P2 / glm::distance(P1, P2));
+}
+
+glm::vec3 computeForces(FiberStraw& fiber, int idx, const std::vector<ForceActuator*>& force_acts) {
+	glm::vec3 forces;
+	for (int i = 0; i < force_acts.size(); i++) {
+		forces += force_acts[i]->computeForce(FIBER_PARTICLE_MASS, fiber.positions[idx]);
+
+	}
+
+	// Spring Forces
+	if (idx - 1 >= 0) {
+		forces += springforce(fiber.positions[idx], fiber.velocities[idx], fiber.positions[idx - 1], fiber.velocities[idx - 1], fiber.distance, FIBER_ELASTICITY, FIBER_DAMPLING);
+		if (idx - 2 >= 0) {
+			forces += springforce(fiber.positions[idx], fiber.velocities[idx], fiber.positions[idx - 2], fiber.velocities[idx - 2], fiber.distance * 2, FIBER_ELASTICITY, FIBER_DAMPLING);
+		}
+	}
+	if (idx + 1 <= fiber.GetCount() - 1) {
+		forces += springforce(fiber.positions[idx], fiber.velocities[idx], fiber.positions[idx + 1], fiber.velocities[idx + 1], fiber.distance, FIBER_ELASTICITY, FIBER_DAMPLING);
+		if (idx + 2 <= fiber.GetCount() - 1) {
+			forces += springforce(fiber.positions[idx], fiber.velocities[idx], fiber.positions[idx + 2], fiber.velocities[idx + 2], fiber.distance * 2, FIBER_ELASTICITY, FIBER_DAMPLING);
+		}
+	}
+	return forces;
+}
+
+
+
+void verlet(float dt, FiberStraw& fiber, const std::vector<Collider*>& colliders, const std::vector<ForceActuator*>& force_acts) {
+	for (int i = 1; i < fiber.GetCount(); i++) {
+		glm::vec3 forces = computeForces(fiber, i, force_acts);
+
+		glm::vec3 newPos = fiber.positions[i] + (fiber.positions[i] - fiber.prevPositions[i]) + forces / FIBER_PARTICLE_MASS * dt*dt;
+		glm::vec3 newVel = (newPos - fiber.positions[i]) / dt;
+
+		// COLLISIONS
+		for (int j = 0; j < colliders.size(); j++) {
+			colliders[j]->computeCollision(fiber.positions[i], newPos);
+		}
+
+		fiber.positions[i] = newPos;
+		fiber.velocities[i] = newVel;
+	}
+
+	
+}
+
 void euler(float dt, ParticleSystem& particles, const std::vector<Collider*>& colliders, const std::vector<ForceActuator*>& force_acts) {
-	for (int i = 0; i < PARTICLE_COUNT; i++) {
+	for (int i = 0; i < MAX_PARTICLES; i++) {
 		glm::vec3 forces;
 		for (int j = 0; j < force_acts.size(); j++) {
 			forces += force_acts[j]->computeForce(PARTICLE_MASS, particles.particlePositions[i]);
 		}
 		glm::vec3 accel = glm::vec3(forces.x / PARTICLE_MASS, forces.y / PARTICLE_MASS, forces.z / PARTICLE_MASS);
-		particles.particleVelocities[i] += (dt * accel);
-		particles.particlePositions[i] += (dt * particles.particleVelocities[i]);
+		
+		glm::vec3 particle_new_velocity = glm::vec3(particles.particleVelocities[i] + (dt * accel));
+		glm::vec3 particle_new_position = glm::vec3(particles.particlePositions[i] + (dt * particles.particleVelocities[i]));
+
 
 		for (int j = 0; j < colliders.size(); j++) {
-			colliders[j]->computeCollision(particles.particlePositions[i], particles.particleVelocities[i], 
-											particles.particlePositions[i], particles.particleVelocities[i]);
+			colliders[j]->computeCollision(particles.particlePositions[i], particles.particleVelocities[i], particle_new_position, particle_new_velocity);
 		}
+
+		particles.particlePositions[i] = particle_new_position;
+		particles.particleVelocities[i] = particle_new_velocity;
 
 	}
 }
@@ -371,7 +516,7 @@ std::vector<Collider*> colliders;
 
 void PhysicsInit() {
 	// Do your initialization code here...
-	for (int i = 0; i < PARTICLE_COUNT; i++) {
+	for (int i = 0; i < MAX_PARTICLES; i++) {
 		float f = Tools::Random();
 		glm::vec3 newPos(
 			Tools::Map(Tools::Random(), 0, 1, -5, 5), 
@@ -383,6 +528,15 @@ void PhysicsInit() {
 			-5 + Tools::Random() * 10,
 			-5 + Tools::Random() * 10);
 		ps->SetParticle(i, newPos, newVel);
+	}
+
+	for (int i = 0; i < fs.FibersCount(); i++) {
+		glm::vec3 newPos(
+			Tools::Map(Tools::Random(), 0, 1, -5, 5),
+			0,
+			Tools::Map(Tools::Random(), 0, 1, -5, 5));
+		
+		fs.SetFiber(i, FiberStraw(newPos, Fiber::numVerts, FIBER_LENGTH));
 	}
 
 	forces.push_back(new GravityForce());
@@ -403,11 +557,35 @@ void PhysicsInit() {
 
 void PhysicsUpdate(float dt) {
 	// Do your update code here...
-	if (PLAYING) {
+	if (SIMULATE_PARTICLES) {
 		euler(dt * TIME_FACTOR, *ps, colliders, forces);
 
-		Particles::updateParticles(0, PARTICLE_COUNT, ps->ParticlesPtr());
+		Particles::updateParticles(0, MAX_PARTICLES, ps->ParticlesPtr());
+
+
+		
 	}
+
+	if (SIMULATE_FIBERS) {
+
+		for (int i = 0; i < fs.FibersCount(); i++) {
+			verlet(dt * TIME_FACTOR, fs[i], colliders, forces);
+
+		}
+	}
+	
+
+
+	static float counter = .0f;
+	counter += dt * SPHERE_ORBITAL_SPEED * TIME_FACTOR;
+	if (counter >= 2*glm::pi<float>()) {
+		counter = 0;
+	}
+
+
+	SPHERE_POS.x = SPHERE_ORBITAL_POINT.x - (glm::cos(counter) * SPHERE_ORBITAL_MAGNITUDE);
+	SPHERE_POS.z = SPHERE_ORBITAL_POINT.z - (glm::sin(counter) * SPHERE_ORBITAL_MAGNITUDE);
+
 
 	Sphere::updateSphere(SPHERE_POS, SPHERE_RAD);
 	Capsule::updateCapsule(CAPSULE_POS_A, CAPSULE_POS_B, CAPSULE_RAD);
@@ -417,7 +595,7 @@ void PhysicsUpdate(float dt) {
 void PhysicsRestart() {
 	delete(ps);
 	ps = new ParticleSystem();
-	for (int i = 0; i < PARTICLE_COUNT; i++) {
+	for (int i = 0; i < MAX_PARTICLES; i++) {
 		float f = Tools::Random();
 		glm::vec3 newPos(
 			Tools::Map(Tools::Random(), 0, 1, -5, 5),
@@ -430,6 +608,16 @@ void PhysicsRestart() {
 			-5 + Tools::Random() * 10);
 
 		ps->SetParticle(i, newPos, newVel);
+	}
+
+	fs = FiberSystem();
+	for (int i = 0; i < fs.FibersCount(); i++) {
+		glm::vec3 newPos(
+			Tools::Map(Tools::Random(), 0, 1, -5, 5),
+			0,
+			Tools::Map(Tools::Random(), 0, 1, -5, 5));
+
+		fs.SetFiber(i, FiberStraw(newPos, Fiber::numVerts, FIBER_LENGTH));
 	}
 }
 
