@@ -11,6 +11,23 @@
 #define SPHERE_MASS 1
 #define SPHERE_RADIUS 1
 
+//GUI
+//Sphere 1
+#define SPHERE_1_MASS_MIN 1
+#define SPHERE_1_MASS_MAX 100
+#define SPHERE_1_RADIUS_MIN 1
+#define SPHERE_1_RADIUS_MAX 10
+//Sphere 2
+#define SPHERE_2_MASS_MIN 1
+#define SPHERE_2_MASS_MAX 100
+#define SPHERE_2_RADIUS_MIN 1
+#define SPHERE_2_RADIUS_MAX 10
+//SPhere 3
+#define SPHERE_3_MASS_MIN 1
+#define SPHERE_3_MASS_MAX 100
+#define SPHERE_3_RADIUS_MIN 1
+#define SPHERE_3_RADIUS_MAX 10
+
 namespace Box {
 	void drawCube();
 }
@@ -94,7 +111,7 @@ void updateColliders(Collider* A, Collider* B) {
 
 
 // Boolean variables allow to show/hide the primitives
-bool renderSphere = false;
+bool renderSphere = true;
 bool renderCapsule = false;
 bool renderParticles = false;
 bool renderMesh = false;
@@ -143,6 +160,23 @@ void GUI() {
 	{	
 		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
 		
+		//Gravity and Elasticity 
+		//ImGui::Text("Gravity");
+		//ImGui::DragFloat("Gravity Value", &GRAVITY_FORCE, 0.1f, minGrabAccel, maxGrabAccel, "%.3f");
+		//ImGui::Text("Elasticity");
+		//ImGui::DragFloat("Elasticity", &BOUNCE_ELASTICITY, 0.05f, 0.0f, 1.0f, "%.3f");
+		//Sphere 1
+		//ImGui::Text("Sphere 1");
+		//ImGui::DragFloat("X 1", &CAPSULE_POS_A.x, 0.1f, SPHERE_1_MASS_MIN, SPHERE_1_MASS_MAX, "%.3f");
+		//ImGui::DragFloat("X 1", &CAPSULE_POS_A.x, 0.1f, SPHERE_1_RADIUS_MIN, SPHERE_1_RADIUS_MAX, "%.3f");
+		//Sphere 2
+		//ImGui::Text("Sphere 2");
+		//ImGui::DragFloat("X 1", &CAPSULE_POS_A.x, 0.1f, SPHERE_2_MASS_MIN, SPHERE_2_MASS_MAX, "%.3f");
+		//ImGui::DragFloat("X 1", &CAPSULE_POS_A.x, 0.1f, SPHERE_2_RADIUS_MIN, SPHERE_2_RADIUS_MAX, "%.3f");
+		//Sphere 3
+		//ImGui::Text("Sphere 3");
+		//ImGui::DragFloat("X 1", &CAPSULE_POS_A.x, 0.1f, SPHERE_3_MASS_MIN, SPHERE_3_MASS_MAX, "%.3f");
+		//ImGui::DragFloat("X 1", &CAPSULE_POS_A.x, 0.1f, SPHERE_3_RADIUS_MIN, SPHERE_3_RADIUS_MAX, "%.3f");
 	}
 	// .........................
 	
