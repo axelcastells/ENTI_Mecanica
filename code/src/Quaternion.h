@@ -19,28 +19,13 @@ namespace Vortex {
 		Quaternion operator +(Quaternion _q);
 		Quaternion operator *(Quaternion _q);
 
+		Quaternion Derivate(float dt, Vector3 angularSpeed);
 		static Quaternion Inverse(Quaternion _q);
 		static Quaternion AxisAngleToQuaternion(Vector3 _axis, float _angle);
 		static AxisAngle QuaternionToAxisAngle(Quaternion _q);
 
 	private:
 		float w, x, y, z;
-
-
-		// Functions:
-
-
-
-
-
-
-
-
-
-
-		
-
-
 
 	};
 }

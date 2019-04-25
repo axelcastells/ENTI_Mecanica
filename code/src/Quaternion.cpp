@@ -84,3 +84,9 @@ AxisAngle Vortex::Quaternion::QuaternionToAxisAngle(Quaternion _q)
 	_axAng.z = (float)(_q.z / Math::Sqrt(1 - _q.w * _q.w));
 	return _axAng;
 }
+
+Quaternion Vortex::Quaternion::Derivate(float dt, Vector3 angularSpeed)
+{
+	angularSpeed = angularSpeed / 2;
+	return Quaternion(0,angularSpeed.x, angularSpeed.y, angularSpeed.z) * *this;
+}
