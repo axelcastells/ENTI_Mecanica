@@ -34,8 +34,7 @@
 #define SPHERE_3_RADIUS_MAX 10
 
 static float GRAVITY_FORCE = 9.81f;
-static glm::vec3 GRAVITY_VECTOR = { 0, 0, 1 };
-
+static glm::vec3 GRAVITY_VECTOR = { 0, -1, 0 };
 
 namespace Box {
 	void drawCube();
@@ -137,7 +136,12 @@ void updateColliders(Collider* A, Collider* B) {
 
 }
 
-
+// BOX
+// X -5 / 5
+// Y 0 / 10
+// Z -5 / 5
+PlaneCol *cage[CAGE_PLANES_COUNT];
+RigidSphere *spheres[SPHERES_COUNT];
 
 
 // Boolean variables allow to show/hide the primitives
@@ -155,7 +159,13 @@ void renderPrims() {
 
 
 	if (renderSphere)
-		Sphere::drawSphere();
+	{
+		for (int i = 0; i < SPHERES_COUNT; i++)
+		{
+			Sphere::updateSphere(spheres[i]->position, spheres[i]->radius);
+			Sphere::drawSphere();
+		}
+	}
 	if (renderCapsule)
 		Capsule::drawCapsule();
 
@@ -174,12 +184,6 @@ void renderPrims() {
 		Cube::drawCube();
 }
 
-// BOX
-// X -5 / 5
-// Y 0 / 10
-// Z -5 / 5
-PlaneCol *cage[CAGE_PLANES_COUNT];
-RigidSphere *spheres[SPHERES_COUNT];
 
 
 void GUI() {
@@ -231,19 +235,26 @@ void PhysicsInit() {
 	cage[4] = new PlaneCol(glm::vec3(0, 0, -CAGE_SIZE / 2), glm::vec3(0, 0, 1));
 	cage[5] = new PlaneCol(glm::vec3(0, 0, CAGE_SIZE / 2), glm::vec3(0, 0, -1));
 
-
-	srand(3473658);
+	srand((unsigned)time(NULL));
 	for (int i = 0; i < SPHERES_COUNT; i++) {
 		spheres[i] = new RigidSphere(glm::vec3((CAGE_SIZE / 2) - (Tools::Random() * (CAGE_SIZE / 2)), 
 											Tools::Random() * CAGE_SIZE,
 											(CAGE_SIZE / 2) - (Tools::Random() * (CAGE_SIZE / 2))),
 											SPHERE_MASS, SPHERE_RADIUS, .1f, 0);
+
 	}
+		
+
+
+	
 	// ...................................
 }
 
 void PhysicsUpdate(float dt) {
 	// Do your update code here...
+	for (int i = 0; i < SPHERES_COUNT; i++) {
+		euler(dt, *spheres[i]);
+	}
 	// ...........................
 }
 
