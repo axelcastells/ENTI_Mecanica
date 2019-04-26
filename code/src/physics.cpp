@@ -91,26 +91,35 @@ struct PlaneCol : Collider {
 
 struct RigidSphere : Collider {
 	//...
-	float mass, radius;
+	float mass, rad;
 	glm::mat3 rotation;
 	glm::vec3 collisionPoint;
 	glm::vec3 position, linearMomentum, angularMomentum, velocity, angularVelocity;
 
-	glm::mat3 IBody() { return SPHERE_IBODY_MATRIX(mass, radius); }
+	glm::mat3 IBody() { return SPHERE_IBODY_MATRIX(mass, rad); }
 
 	RigidSphere() = delete;
 	RigidSphere(glm::vec3 _pos, float _mass, float _rad, float _linearVel, float _angularVel) :
-		mass(_mass), radius(_rad), position(_pos), linearMomentum(_linearVel), angularMomentum(_angularVel)
+		mass(_mass), rad(_rad), position(_pos), linearMomentum(_linearVel), angularMomentum(_angularVel)
 	{
 		rotation = glm::mat3(1);
 	}
 	bool checkCollision(const glm::vec3& next_pos, float radius) override {
 		//...
-
-		collisionPoint = position;
+		if (glm::distance(position, next_pos) <= rad + radius) {
+			collisionPoint = position + (glm::normalize(position - next_pos) * rad);
+			return true;
+		}
 		return false;
 	}
 };
+
+
+// BOX
+// X -5 / 5
+// Y 0 / 10
+// Z -5 / 5
+std::vector<Collider*> colliders;
 
 void euler(float dt, RigidSphere& sph) {
 	glm::vec3 force = (GRAVITY_FORCE * sph.mass * GRAVITY_VECTOR);
@@ -126,6 +135,22 @@ void euler(float dt, RigidSphere& sph) {
 	glm::vec3 angularVel = inertiaTensorInverse * sph.angularMomentum;
 	
 	sph.rotation += dt * (angularVel * sph.rotation);
+
+	// COLLISION CHECKS
+	for (int i = 0; i < SPHERES_COUNT + CAGE_PLANES_COUNT; i++) {
+		if (colliders[i] == &sph);
+		else 
+		{
+			if (colliders[i]->checkCollision(sph.position, sph.rad)) 
+			{
+				// COMPUTE COLLISION
+
+				// Call: float computeImpulseCorrection
+				// -----------------
+			}
+		}
+
+	}
 }
 
 float computeImpulseCorrection(float massA, glm::vec3 ra, glm::mat3 invIa, float massB, glm::vec3 rb, glm::mat3 invIb, float vrel, float epsilon, glm::vec3 normal) {
@@ -135,14 +160,6 @@ float computeImpulseCorrection(float massA, glm::vec3 ra, glm::mat3 invIa, float
 void updateColliders(Collider* A, Collider* B) {
 
 }
-
-// BOX
-// X -5 / 5
-// Y 0 / 10
-// Z -5 / 5
-PlaneCol *cage[CAGE_PLANES_COUNT];
-RigidSphere *spheres[SPHERES_COUNT];
-
 
 // Boolean variables allow to show/hide the primitives
 bool renderSphere = true;
@@ -162,7 +179,7 @@ void renderPrims() {
 	{
 		for (int i = 0; i < SPHERES_COUNT; i++)
 		{
-			Sphere::updateSphere(spheres[i]->position, spheres[i]->radius);
+			Sphere::updateSphere(dynamic_cast<RigidSphere*>(colliders[i])->position, dynamic_cast<RigidSphere*>(colliders[i])->rad);
 			Sphere::drawSphere();
 		}
 	}
@@ -228,32 +245,29 @@ void GUI() {
 
 void PhysicsInit() {
 	// Do your initialization code here...
-	cage[0] = new PlaneCol(glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-	cage[1] = new PlaneCol(glm::vec3(0, CAGE_SIZE, 0), glm::vec3(0, -1, 0));
-	cage[2] = new PlaneCol(glm::vec3(-CAGE_SIZE / 2, 0, 0), glm::vec3(1, 0, 0));
-	cage[3] = new PlaneCol(glm::vec3(CAGE_SIZE / 2, 0, 0), glm::vec3(-1, 0, 0));
-	cage[4] = new PlaneCol(glm::vec3(0, 0, -CAGE_SIZE / 2), glm::vec3(0, 0, 1));
-	cage[5] = new PlaneCol(glm::vec3(0, 0, CAGE_SIZE / 2), glm::vec3(0, 0, -1));
-
 	srand((unsigned)time(NULL));
 	for (int i = 0; i < SPHERES_COUNT; i++) {
-		spheres[i] = new RigidSphere(glm::vec3((CAGE_SIZE / 2) - (Tools::Random() * (CAGE_SIZE / 2)), 
+		colliders.push_back(new RigidSphere(glm::vec3((CAGE_SIZE / 2) - (Tools::Random() * (CAGE_SIZE / 2)),
 											Tools::Random() * CAGE_SIZE,
 											(CAGE_SIZE / 2) - (Tools::Random() * (CAGE_SIZE / 2))),
-											SPHERE_MASS, SPHERE_RADIUS, .1f, 0);
+											SPHERE_MASS, SPHERE_RADIUS, .1f, 0));
 
 	}
+	colliders.push_back(new PlaneCol(glm::vec3(0, 0, 0), glm::vec3(0, 1, 0)));
+	colliders.push_back(new PlaneCol(glm::vec3(0, CAGE_SIZE, 0), glm::vec3(0, -1, 0)));
+	colliders.push_back(new PlaneCol(glm::vec3(-CAGE_SIZE / 2, 0, 0), glm::vec3(1, 0, 0)));
+	colliders.push_back(new PlaneCol(glm::vec3(CAGE_SIZE / 2, 0, 0), glm::vec3(-1, 0, 0)));
+	colliders.push_back(new PlaneCol(glm::vec3(0, 0, -CAGE_SIZE / 2), glm::vec3(0, 0, 1)));
+	colliders.push_back(new PlaneCol(glm::vec3(0, 0, CAGE_SIZE / 2), glm::vec3(0, 0, -1)));
+
 		
-
-
-	
 	// ...................................
 }
 
 void PhysicsUpdate(float dt) {
 	// Do your update code here...
 	for (int i = 0; i < SPHERES_COUNT; i++) {
-		euler(dt, *spheres[i]);
+		euler(dt, dynamic_cast<RigidSphere&>(*colliders[i]));
 	}
 	// ...........................
 }
