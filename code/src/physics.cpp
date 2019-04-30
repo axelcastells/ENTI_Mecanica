@@ -2,6 +2,7 @@
 #include <imgui\imgui_impl_sdl_gl3.h>
 #include <glm\gtc\matrix_transform.hpp>
 #include <vector>
+#include <thread>
 
 #include "Tools.h"
 
@@ -35,6 +36,9 @@
 
 static float GRAVITY_FORCE = 9.81f;
 static glm::vec3 GRAVITY_VECTOR = { 0, -1, 0 };
+
+void PhysicsCleanup();
+void ResetSimulation();
 
 namespace Box {
 	void drawCube();
@@ -99,7 +103,7 @@ struct RigidSphere : Collider {
 	glm::mat3 IBody() { return SPHERE_IBODY_MATRIX(mass, rad); }
 
 	RigidSphere() = delete;
-	RigidSphere(glm::vec3 _pos, float _mass, float _rad, float _linearVel, float _angularVel) :
+	RigidSphere(glm::vec3 _pos, float _mass, float _rad, glm::vec3 _linearVel, glm::vec3 _angularVel) :
 		mass(_mass), rad(_rad), position(_pos), linearMomentum(_linearVel), angularMomentum(_angularVel)
 	{
 		rotation = glm::mat3(1);
@@ -241,16 +245,13 @@ void GUI() {
 	}
 }
 
-
-
-void PhysicsInit() {
-	// Do your initialization code here...
-	srand((unsigned)time(NULL));
+void PhysicsReset() {
 	for (int i = 0; i < SPHERES_COUNT; i++) {
 		colliders.push_back(new RigidSphere(glm::vec3((CAGE_SIZE / 2) - (Tools::Random() * (CAGE_SIZE / 2)),
-											Tools::Random() * CAGE_SIZE,
-											(CAGE_SIZE / 2) - (Tools::Random() * (CAGE_SIZE / 2))),
-											SPHERE_MASS, SPHERE_RADIUS, .1f, 0));
+			Tools::Random() * CAGE_SIZE,
+			(CAGE_SIZE / 2) - (Tools::Random() * (CAGE_SIZE / 2))),
+			SPHERE_MASS, SPHERE_RADIUS, glm::vec3(Tools::Map(Tools::Random(), 0, 1, -3, 3), Tools::Map(Tools::Random(), 0, 1, -3, 3), Tools::Map(Tools::Random(), 0, 1, -3, 3)),
+			glm::vec3(Tools::Map(Tools::Random(), 0, 1, -3, 3), Tools::Map(Tools::Random(), 0, 1, -3, 3), Tools::Map(Tools::Random(), 0, 1, -3, 3))));
 
 	}
 	colliders.push_back(new PlaneCol(glm::vec3(0, 0, 0), glm::vec3(0, 1, 0)));
@@ -259,8 +260,21 @@ void PhysicsInit() {
 	colliders.push_back(new PlaneCol(glm::vec3(CAGE_SIZE / 2, 0, 0), glm::vec3(-1, 0, 0)));
 	colliders.push_back(new PlaneCol(glm::vec3(0, 0, -CAGE_SIZE / 2), glm::vec3(0, 0, 1)));
 	colliders.push_back(new PlaneCol(glm::vec3(0, 0, CAGE_SIZE / 2), glm::vec3(0, 0, -1)));
+}
 
-		
+void ResetSimulation() {
+	while (1) {
+		std::this_thread::sleep_for(std::chrono::seconds(15));
+		PhysicsCleanup();
+		PhysicsReset();
+	}
+}
+void PhysicsInit() {
+	// Do your initialization code here...
+	srand((unsigned)time(NULL));
+	PhysicsReset();
+	std::thread simulationResetCycler(ResetSimulation);
+	simulationResetCycler.detach();
 	// ...................................
 }
 
@@ -274,5 +288,6 @@ void PhysicsUpdate(float dt) {
 
 void PhysicsCleanup() {
 	// Do your cleanup code here...
+	colliders.clear();
 	// ............................
 }
