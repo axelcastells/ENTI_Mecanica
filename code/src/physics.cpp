@@ -3,6 +3,7 @@
 #include <glm\gtc\matrix_transform.hpp>
 #include <vector>
 #include <thread>
+#include <iostream>
 
 #include "Tools.h"
 
@@ -36,6 +37,7 @@
 
 static float GRAVITY_FORCE = 9.81f;
 static glm::vec3 GRAVITY_VECTOR = { 0, -1, 0 };
+static float RESTITUTION_FACTOR = 1.f;
 
 void PhysicsCleanup();
 void ResetSimulation();
@@ -95,10 +97,11 @@ struct PlaneCol : Collider {
 
 struct RigidSphere : Collider {
 	//...
-	float mass, rad;
+	float mass, rad, j;
 	glm::mat3 rotation;
 	glm::vec3 collisionPoint;
 	glm::vec3 position, linearMomentum, angularMomentum, velocity, angularVelocity;
+	
 
 	glm::mat3 IBody() { return SPHERE_IBODY_MATRIX(mass, rad); }
 
@@ -125,6 +128,26 @@ struct RigidSphere : Collider {
 // Z -5 / 5
 std::vector<Collider*> colliders;
 
+float computeImpulseCorrection(float massA, glm::vec3 ra, glm::mat3 invIa, float massB, glm::vec3 rb, glm::mat3 invIb, float vrel, float epsilon, glm::vec3 normal) {
+	// "-vrel" representa la "inversa" de la velocitat real.
+	return -(1 + epsilon)* (-vrel) / (1 / massA) + (1 / massB) + glm::dot(normal, glm::cross((invIa * glm::cross(ra, normal)), ra)) + glm::dot(normal, glm::cross((invIb * glm::cross(rb, normal)), rb));
+}
+
+void updateColliders(Collider* A, Collider* B) {
+	RigidSphere* sphA;
+	RigidSphere* sphB;
+	sphA = dynamic_cast<RigidSphere*>(A);
+	sphB = dynamic_cast<RigidSphere*>(B);
+
+	if (sphA != NULL && sphB != NULL) {
+		sphA->linearMomentum = sphA->linearMomentum + sphA->j * glm::normalize(sphA->position - sphB->position);// glm::cross(sphA->position, (sphA->j*glm::normalize(sphA->position - sphB->position)));
+		sphA->angularMomentum = sphA->angularMomentum + glm::cross(sphA->position, sphA->j * glm::normalize(sphA->position - sphB->position));
+
+		sphB->linearMomentum = sphB->linearMomentum + sphB->j * glm::normalize(sphB->position - sphA->position);
+		sphB->angularMomentum = sphB->angularMomentum + glm::cross(sphB->position, sphB->j * glm::normalize(sphA->position - sphA->position));
+	}
+}
+
 void euler(float dt, RigidSphere& sph) {
 	glm::vec3 force = (GRAVITY_FORCE * sph.mass * GRAVITY_VECTOR);
 	glm::vec3 torque = glm::cross(sph.collisionPoint - sph.position, force);
@@ -136,9 +159,6 @@ void euler(float dt, RigidSphere& sph) {
 
 	glm::mat3 inertiaTensorInverse = sph.rotation * glm::inverse(sph.IBody()) * glm::transpose(sph.rotation);
 
-	glm::vec3 angularVel = inertiaTensorInverse * sph.angularMomentum;
-	
-	sph.rotation += dt * (angularVel * sph.rotation);
 
 	// COLLISION CHECKS
 	for (int i = 0; i < SPHERES_COUNT + CAGE_PLANES_COUNT; i++) {
@@ -147,23 +167,45 @@ void euler(float dt, RigidSphere& sph) {
 		{
 			if (colliders[i]->checkCollision(sph.position, sph.rad)) 
 			{
-				// COMPUTE COLLISION
-
-				// Call: float computeImpulseCorrection
-				// -----------------
+				RigidSphere* sphere;
+				sphere = dynamic_cast<RigidSphere*>(colliders[i]);
+				if (sphere != NULL)
+				{
+					std::cout << "Sphere-Sphere Collision!" << std::endl;
+					// SPHERES COLLISION
+					glm::mat3 newIntertiaTensor = sphere->rotation * glm::inverse(sphere->IBody()) * glm::transpose(sphere->rotation);
+					
+					// TODO: Calculate vrel
+					glm::vec3 pa = sph.velocity + glm::cross(sph.angularVelocity, sph.collisionPoint - sph.position);
+					glm::vec3 pb = sphere->velocity + glm::cross(sphere->angularVelocity, sphere->collisionPoint - sphere->position);
+					float vrel = glm::dot(sph.position - sph.collisionPoint, pa - pb);
+					float j = computeImpulseCorrection(sph.mass, sph.position, inertiaTensorInverse, sphere->mass, sphere->position, newIntertiaTensor, vrel, RESTITUTION_FACTOR, glm::normalize(sph.position - sph.collisionPoint));
+					
+					sph.j = j;
+					sphere->j = -j;
+					
+					updateColliders(&sph, sphere);
+				}
+				else
+				{
+					delete(sphere);
+					PlaneCol* plane;
+					plane = dynamic_cast<PlaneCol*>(colliders[i]);
+					if (plane != NULL) 
+					{
+						// PLANES COLLISION
+					}
+					delete(plane);
+				}
 			}
 		}
 
 	}
+
+	glm::vec3 angularVel = inertiaTensorInverse * sph.angularMomentum;
+	sph.rotation += dt * (angularVel * sph.rotation);
 }
 
-float computeImpulseCorrection(float massA, glm::vec3 ra, glm::mat3 invIa, float massB, glm::vec3 rb, glm::mat3 invIb, float vrel, float epsilon, glm::vec3 normal) {
-	return 0;
-}
-
-void updateColliders(Collider* A, Collider* B) {
-
-}
 
 // Boolean variables allow to show/hide the primitives
 bool renderSphere = true;
@@ -264,7 +306,7 @@ void PhysicsReset() {
 
 void ResetSimulation() {
 	while (1) {
-		std::this_thread::sleep_for(std::chrono::seconds(15));
+		std::this_thread::sleep_for(std::chrono::seconds(1));
 		PhysicsCleanup();
 		PhysicsReset();
 	}
