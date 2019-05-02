@@ -337,8 +337,8 @@ void GUI() {
 			std::string name("Sphere " + std::to_string(i));
 			RigidSphere* sphere = dynamic_cast<RigidSphere*>(colliders[i]);
 			ImGui::Text(name.c_str());
-			ImGui::DragFloat(std::string("Mass" + std::to_string(i)).c_str(), &sphere->mass, 0.1f, SPHERE_MASS_MIN, SPHERE_MASS_MAX, "%.3f");
-			ImGui::DragFloat(std::string("Radius" + std::to_string(i)).c_str(), &sphere->rad, 0.1f, SPHERE_RADIUS_MIN, SPHERE_RADIUS_MAX, "%.3f");
+			ImGui::DragFloat(std::string("Mass " + std::to_string(i)).c_str(), &sphere->mass, 0.1f, SPHERE_MASS_MIN, SPHERE_MASS_MAX, "%.3f");
+			ImGui::DragFloat(std::string("Radius " + std::to_string(i)).c_str(), &sphere->rad, 0.1f, SPHERE_RADIUS_MIN, SPHERE_RADIUS_MAX, "%.3f");
 
 		}
 
