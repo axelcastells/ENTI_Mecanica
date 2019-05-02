@@ -20,24 +20,15 @@
 
 //GUI
 //Sphere 1
-#define SPHERE_1_MASS_MIN 1
-#define SPHERE_1_MASS_MAX 100
-#define SPHERE_1_RADIUS_MIN 1
-#define SPHERE_1_RADIUS_MAX 10
-//Sphere 2
-#define SPHERE_2_MASS_MIN 1
-#define SPHERE_2_MASS_MAX 100
-#define SPHERE_2_RADIUS_MIN 1
-#define SPHERE_2_RADIUS_MAX 10
-//SPhere 3
-#define SPHERE_3_MASS_MIN 1
-#define SPHERE_3_MASS_MAX 100
-#define SPHERE_3_RADIUS_MIN 1
-#define SPHERE_3_RADIUS_MAX 10
+#define SPHERE_MASS_MIN 1
+#define SPHERE_MASS_MAX 100
+#define SPHERE_RADIUS_MIN 1
+#define SPHERE_RADIUS_MAX 10
 
 static float GRAVITY_FORCE = 9.81f;
 static glm::vec3 GRAVITY_VECTOR = { 0, -1, 0 };
 static float RESTITUTION_FACTOR = 1.f;
+static float TIME_SCALE = 1.f;
 
 void PhysicsCleanup();
 void ResetSimulation();
@@ -84,14 +75,30 @@ struct Collider {
 };
 
 struct PlaneCol : Collider {
-	glm::vec3 position, normal;
+	glm::vec3 position, planeNormal, contactPoint;
 
 	PlaneCol(){}
-	PlaneCol(glm::vec3 _pos, glm::vec3 _norm) : position(_pos), normal(_norm){}
+	PlaneCol(glm::vec3 _pos, glm::vec3 _norm) : position(_pos), planeNormal(_norm){}
+
+	void getPlane(glm::vec3& normal, float& d) {
+		normal = planeNormal;
+		d = glm::dot(-normal, position);
+	}
 
 	bool checkCollision(const glm::vec3& next_pos, float radius) override {
-		//...
-		return false;
+		//return false;
+		glm::vec3 norm;
+		float d;
+		getPlane(norm, d);
+
+
+		float distance = ((next_pos.x * norm.x) + (next_pos.y * norm.y) + (next_pos.z * norm.z) + d);
+
+		// TODO: FIND REAL COLLISION POINT
+
+		if (distance <= radius) return true;
+		else return false;
+
 	}
 };
 
@@ -99,7 +106,7 @@ struct RigidSphere : Collider {
 	//...
 	float mass, rad, j;
 	glm::mat3 rotation;
-	glm::vec3 collisionPoint;
+	glm::vec3 contactPoint;
 	glm::vec3 position, linearMomentum, angularMomentum, velocity, angularVelocity;
 	
 
@@ -114,7 +121,10 @@ struct RigidSphere : Collider {
 	bool checkCollision(const glm::vec3& next_pos, float radius) override {
 		//...
 		if (glm::distance(position, next_pos) <= rad + radius) {
-			collisionPoint = position + (glm::normalize(position - next_pos) * rad);
+			
+			// TODO: FIND REAL COLLISION POINT
+
+			contactPoint = position + (glm::normalize(position - next_pos) * rad);
 			return true;
 		}
 		return false;
@@ -130,7 +140,14 @@ std::vector<Collider*> colliders;
 
 float computeImpulseCorrection(float massA, glm::vec3 ra, glm::mat3 invIa, float massB, glm::vec3 rb, glm::mat3 invIb, float vrel, float epsilon, glm::vec3 normal) {
 	// "-vrel" representa la "inversa" de la velocitat real.
-	return -(1 + epsilon)* (-vrel) / (1 / massA) + (1 / massB) + glm::dot(normal, glm::cross((invIa * glm::cross(ra, normal)), ra)) + glm::dot(normal, glm::cross((invIb * glm::cross(rb, normal)), rb));
+	if (massB < 0) {
+		return-(1 + epsilon)* (vrel) / ((1 / massA) + glm::dot(normal, glm::cross((invIa * glm::cross(ra, normal)), ra)));
+	}
+	else {
+		return -(1 + epsilon)* (vrel) / ((1 / massA) + (1 / massB) + glm::dot(normal, glm::cross((invIa * glm::cross(ra, normal)), ra)) +
+			glm::dot(normal, glm::cross((invIb * glm::cross(rb, normal)), rb)));
+	}
+	
 }
 
 void updateColliders(Collider* A, Collider* B) {
@@ -141,16 +158,31 @@ void updateColliders(Collider* A, Collider* B) {
 
 	if (sphA != NULL && sphB != NULL) {
 		sphA->linearMomentum = sphA->linearMomentum + sphA->j * glm::normalize(sphA->position - sphB->position);// glm::cross(sphA->position, (sphA->j*glm::normalize(sphA->position - sphB->position)));
-		sphA->angularMomentum = sphA->angularMomentum + glm::cross(sphA->position, sphA->j * glm::normalize(sphA->position - sphB->position));
+		sphA->angularMomentum = sphA->angularMomentum + glm::cross(sphA->contactPoint - sphA->position, sphA->j * glm::normalize(sphA->position - sphB->position));
 
 		sphB->linearMomentum = sphB->linearMomentum + sphB->j * glm::normalize(sphB->position - sphA->position);
-		sphB->angularMomentum = sphB->angularMomentum + glm::cross(sphB->position, sphB->j * glm::normalize(sphA->position - sphA->position));
+		sphB->angularMomentum = sphB->angularMomentum + glm::cross(sphB->contactPoint - sphB->position, sphB->j * glm::normalize(sphA->position - sphA->position));
 	}
+	else if (sphA != NULL) {
+		PlaneCol* plane = dynamic_cast<PlaneCol*>(B);
+		if (plane != NULL) {
+			sphA->linearMomentum = sphA->linearMomentum + sphA->j * glm::normalize(sphA->position - plane->contactPoint);// glm::cross(sphA->position, (sphA->j*glm::normalize(sphA->position - sphB->position)));
+			sphA->angularMomentum = sphA->angularMomentum + glm::cross(sphA->contactPoint - sphA->position, sphA->j * glm::normalize(sphA->position - plane->contactPoint));
+		}
+		plane = 0;
+		delete(plane);
+	}
+
+	sphA = 0;
+	sphB = 0;
+	delete(sphA);
+	delete(sphB);
+	
 }
 
 void euler(float dt, RigidSphere& sph) {
 	glm::vec3 force = (GRAVITY_FORCE * sph.mass * GRAVITY_VECTOR);
-	glm::vec3 torque = glm::cross(sph.collisionPoint - sph.position, force);
+	glm::vec3 torque = glm::cross(sph.contactPoint - sph.position, force);
 	sph.linearMomentum = sph.linearMomentum + dt*force;
 	sph.angularMomentum = sph.angularMomentum + dt*torque;
 
@@ -171,30 +203,54 @@ void euler(float dt, RigidSphere& sph) {
 				sphere = dynamic_cast<RigidSphere*>(colliders[i]);
 				if (sphere != NULL)
 				{
+					// Cerca punt de colisió real
+
+					// ----
+					/*
 					std::cout << "Sphere-Sphere Collision!" << std::endl;
 					// SPHERES COLLISION
-					glm::mat3 newIntertiaTensor = sphere->rotation * glm::inverse(sphere->IBody()) * glm::transpose(sphere->rotation);
+					glm::mat3 newIntertiaTensor = sph.rotation * glm::inverse(sph.IBody()) * glm::transpose(sph.rotation);
 					
 					// TODO: Calculate vrel
 					glm::vec3 pa = sph.velocity + glm::cross(sph.angularVelocity, sph.collisionPoint - sph.position);
 					glm::vec3 pb = sphere->velocity + glm::cross(sphere->angularVelocity, sphere->collisionPoint - sphere->position);
-					float vrel = glm::dot(sph.position - sph.collisionPoint, pa - pb);
-					float j = computeImpulseCorrection(sph.mass, sph.position, inertiaTensorInverse, sphere->mass, sphere->position, newIntertiaTensor, vrel, RESTITUTION_FACTOR, glm::normalize(sph.position - sph.collisionPoint));
+					float vrel = glm::dot(glm::normalize(sph.position - sph.collisionPoint), pa - pb);
+					float j = computeImpulseCorrection(sph.mass, sph.position, inertiaTensorInverse, sphere->mass, sphere->position, newIntertiaTensor, 
+						vrel, RESTITUTION_FACTOR, glm::normalize(sph.position - sph.collisionPoint));
 					
 					sph.j = j;
 					sphere->j = -j;
 					
 					updateColliders(&sph, sphere);
+					*/
 				}
 				else
 				{
+					sphere = 0;
 					delete(sphere);
 					PlaneCol* plane;
 					plane = dynamic_cast<PlaneCol*>(colliders[i]);
 					if (plane != NULL) 
 					{
 						// PLANES COLLISION
+						glm::vec3 pNorm;
+						float d;
+						plane->getPlane(pNorm, d);
+
+						std::cout << "Sphere-Plane Collision!" << std::endl;
+						glm::mat3 newIntertiaTensor = sph.rotation * glm::inverse(sph.IBody()) * glm::transpose(sph.rotation);
+
+						//// TODO: Calculate vrel
+						glm::vec3 pa = sph.velocity + glm::cross(sph.angularVelocity, sph.contactPoint - sph.position);
+
+						float vrel = glm::dot(glm::normalize(sph.position - sph.contactPoint), pa);
+						float j = computeImpulseCorrection(sph.mass, sph.position, inertiaTensorInverse, -1, plane->contactPoint, newIntertiaTensor,
+							vrel, RESTITUTION_FACTOR, glm::normalize(sph.position - sph.contactPoint));
+
+						updateColliders(&sph, plane);
+
 					}
+					plane = 0;
 					delete(plane);
 				}
 			}
@@ -305,23 +361,26 @@ void PhysicsReset() {
 }
 
 void ResetSimulation() {
-	while (1) {
-		std::this_thread::sleep_for(std::chrono::seconds(1));
-		PhysicsCleanup();
-		PhysicsReset();
-	}
+	PhysicsCleanup();
+	PhysicsReset();
 }
 void PhysicsInit() {
 	// Do your initialization code here...
 	srand((unsigned)time(NULL));
 	PhysicsReset();
-	std::thread simulationResetCycler(ResetSimulation);
-	simulationResetCycler.detach();
 	// ...................................
 }
 
 void PhysicsUpdate(float dt) {
+	dt *= TIME_SCALE;
 	// Do your update code here...
+	static float counter;
+	counter += dt;
+	if (counter >= 2) {
+		counter = 0;
+		ResetSimulation();
+	}
+
 	for (int i = 0; i < SPHERES_COUNT; i++) {
 		euler(dt, dynamic_cast<RigidSphere&>(*colliders[i]));
 	}
