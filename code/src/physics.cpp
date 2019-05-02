@@ -4,6 +4,7 @@
 #include <vector>
 #include <thread>
 #include <iostream>
+#include <string>
 
 #include "Tools.h"
 
@@ -18,18 +19,29 @@
 #define SPHERE_MASS 1
 #define SPHERE_RADIUS 1
 
+#define COLLISION_MAX_ITERATIONS 20
+#define COLLISION_TOLERANCE 0.1f;
+
 //GUI
+#define GRAVITY_MIN 0
+#define GRAVITY_MAX 10
 //Sphere 1
 #define SPHERE_MASS_MIN 1
 #define SPHERE_MASS_MAX 100
-#define SPHERE_RADIUS_MIN 1
+#define SPHERE_RADIUS_MIN 0.1f
 #define SPHERE_RADIUS_MAX 10
 
-static float GRAVITY_FORCE = 9.81f;
-static glm::vec3 GRAVITY_VECTOR = { 0, -1, 0 };
-static float RESTITUTION_FACTOR = 1.f;
-static float TIME_SCALE = 1.f;
+#pragma region Parameters
+static float GRAVITY_FORCE = 9.81f;					// Gravity Force
+static glm::vec3 GRAVITY_VECTOR = { 0, -1, 0 };		// Gravity Vector
+static float RESTITUTION_FACTOR = 1.f;				// Elasticity
+static bool SIMULATE = false;						// Simulation Boolean
+static float TIME_SCALE = 1.f;						// Time Scale
 
+#pragma endregion
+
+
+static float counter;
 void PhysicsCleanup();
 void ResetSimulation();
 
@@ -72,6 +84,7 @@ namespace Cube {
 
 struct Collider {
 	virtual bool checkCollision(const glm::vec3& next_pos, float radius) = 0;
+	//virtual bool findContactPoint(); // TO DO
 };
 
 struct PlaneCol : Collider {
@@ -203,9 +216,6 @@ void euler(float dt, RigidSphere& sph) {
 				sphere = dynamic_cast<RigidSphere*>(colliders[i]);
 				if (sphere != NULL)
 				{
-					// Cerca punt de colisió real
-
-					// ----
 					/*
 					std::cout << "Sphere-Sphere Collision!" << std::endl;
 					// SPHERES COLLISION
@@ -312,24 +322,26 @@ void GUI() {
 	// Do your GUI code here....
 	{	
 		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
-		
-		//Gravity and Elasticity 
-		//ImGui::Text("Gravity");
-		//ImGui::DragFloat("Gravity Value", &GRAVITY_FORCE, 0.1f, minGrabAccel, maxGrabAccel, "%.3f");
-		//ImGui::Text("Elasticity");
-		//ImGui::DragFloat("Elasticity", &BOUNCE_ELASTICITY, 0.05f, 0.0f, 1.0f, "%.3f");
-		//Sphere 1
-		//ImGui::Text("Sphere 1");
-		//ImGui::DragFloat("X 1", &CAPSULE_POS_A.x, 0.1f, SPHERE_1_MASS_MIN, SPHERE_1_MASS_MAX, "%.3f");
-		//ImGui::DragFloat("X 1", &CAPSULE_POS_A.x, 0.1f, SPHERE_1_RADIUS_MIN, SPHERE_1_RADIUS_MAX, "%.3f");
-		//Sphere 2
-		//ImGui::Text("Sphere 2");
-		//ImGui::DragFloat("X 1", &CAPSULE_POS_A.x, 0.1f, SPHERE_2_MASS_MIN, SPHERE_2_MASS_MAX, "%.3f");
-		//ImGui::DragFloat("X 1", &CAPSULE_POS_A.x, 0.1f, SPHERE_2_RADIUS_MIN, SPHERE_2_RADIUS_MAX, "%.3f");
-		//Sphere 3
-		//ImGui::Text("Sphere 3");
-		//ImGui::DragFloat("X 1", &CAPSULE_POS_A.x, 0.1f, SPHERE_3_MASS_MIN, SPHERE_3_MASS_MAX, "%.3f");
-		//ImGui::DragFloat("X 1", &CAPSULE_POS_A.x, 0.1f, SPHERE_3_RADIUS_MIN, SPHERE_3_RADIUS_MAX, "%.3f");
+		ImGui::Checkbox("Play/Pause Simulation", &SIMULATE);
+		if(ImGui::Button("Reset Simulation", ImVec2(130, 20))) 
+		{
+			ResetSimulation();
+		}
+
+		ImGui::DragFloat("Gravity Value", &GRAVITY_FORCE, 0.1f, GRAVITY_MIN, GRAVITY_MAX, "%.3f");
+		ImGui::DragFloat3("Gravity Vector", &GRAVITY_VECTOR.x, 0.1f, 0, 1, "%.3f");
+		ImGui::DragFloat("Elasticity", &RESTITUTION_FACTOR, 0.05f, 0.0f, 1.0f, "%.3f");
+
+
+		for (int i = 0; i < SPHERES_COUNT; i++) {
+			std::string name("Sphere " + std::to_string(i));
+			RigidSphere* sphere = dynamic_cast<RigidSphere*>(colliders[i]);
+			ImGui::Text(name.c_str());
+			ImGui::DragFloat(std::string("Mass" + std::to_string(i)).c_str(), &sphere->mass, 0.1f, SPHERE_MASS_MIN, SPHERE_MASS_MAX, "%.3f");
+			ImGui::DragFloat(std::string("Radius" + std::to_string(i)).c_str(), &sphere->rad, 0.1f, SPHERE_RADIUS_MIN, SPHERE_RADIUS_MAX, "%.3f");
+
+		}
+
 	}
 	// .........................
 	
@@ -361,6 +373,7 @@ void PhysicsReset() {
 }
 
 void ResetSimulation() {
+	counter = 0;
 	PhysicsCleanup();
 	PhysicsReset();
 }
@@ -372,19 +385,22 @@ void PhysicsInit() {
 }
 
 void PhysicsUpdate(float dt) {
-	dt *= TIME_SCALE;
-	// Do your update code here...
-	static float counter;
-	counter += dt;
-	if (counter >= 2) {
-		counter = 0;
-		ResetSimulation();
-	}
+	if (SIMULATE) {
 
-	for (int i = 0; i < SPHERES_COUNT; i++) {
-		euler(dt, dynamic_cast<RigidSphere&>(*colliders[i]));
+		dt *= TIME_SCALE;
+		// Do your update code here...
+
+		counter += dt;
+		if (counter >= 2) {
+			counter = 0;
+			ResetSimulation();
+		}
+
+		for (int i = 0; i < SPHERES_COUNT; i++) {
+			euler(dt, dynamic_cast<RigidSphere&>(*colliders[i]));
+		}
+		// ...........................
 	}
-	// ...........................
 }
 
 void PhysicsCleanup() {
