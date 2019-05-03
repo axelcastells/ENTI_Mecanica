@@ -11,16 +11,13 @@
 #define DEG2RAD 0.0174532924
 #define RAD2DEG 57.29578
 
-#define SPHERE_IBODY_MATRIX(m, r) glm::mat3((m * (r*r)) * (2/5))
+#define SPHERE_IBODY_MATRIX(m, r) glm::mat3((m * (r*r)) * (2.f/5.f))
 
 #define SPHERES_COUNT 3
 #define CAGE_SIZE 10
 #define CAGE_PLANES_COUNT 6
-#define SPHERE_MASS 1
-#define SPHERE_RADIUS 1
-
-#define COLLISION_MAX_ITERATIONS 20
-#define COLLISION_TOLERANCE 0.1f;
+#define SPHERE_START_MASS 3
+#define SPHERE_START_RADIUS 1
 
 //GUI
 #define GRAVITY_MIN 0
@@ -124,7 +121,6 @@ struct RigidSphere : Collider {
 	//...
 	float mass, rad, j;
 	glm::mat3 rotation;
-	glm::vec3 contactPoint;
 	glm::vec3 prevPosition, position, linearMomentum, angularMomentum, velocity, angularVelocity;
 	
 
@@ -163,6 +159,8 @@ void FindContactPoint(RigidSphere& sph, float dt, Collider* col, int accuracy, f
 		sph.position = sph.prevPosition + dt * sph.velocity;
 		if (glm::abs(glm::distance(sph.position, col->contactPoint) < tolerance)) break;
 	}
+
+	sph.contactPoint = sph.position + (glm::normalize(col->contactPoint - sph.contactPoint) * sph.rad);
 }
 
 // BOX
@@ -173,8 +171,9 @@ std::vector<Collider*> colliders;
 
 float computeImpulseCorrection(float massA, glm::vec3 ra, glm::mat3 invIa, float massB, glm::vec3 rb, glm::mat3 invIb, float vrel, float epsilon, glm::vec3 normal) {
 	// "-vrel" representa la "inversa" de la velocitat real.
+
 	if (massB < 0) {
-		return-(1 + epsilon)* (vrel) / ((1 / massA) + glm::dot(normal, glm::cross((invIa * glm::cross(ra, normal)), ra)));
+		return -(1 + epsilon)* (vrel) / ((1 / massA) + glm::dot(normal, glm::cross((invIa * glm::cross(ra, normal)), ra)));
 	}
 	else {
 		return -(1 + epsilon)* (vrel) / ((1 / massA) + (1 / massB) + glm::dot(normal, glm::cross((invIa * glm::cross(ra, normal)), ra)) +
@@ -222,8 +221,7 @@ void euler(float dt, RigidSphere& sph) {
 	sph.velocity = sph.linearMomentum / sph.mass;
 	sph.position = sph.position + dt* sph.velocity;
 
-	glm::mat3 inertiaTensorInverse = sph.rotation * glm::inverse(sph.IBody()) * glm::transpose(sph.rotation);
-
+	glm::mat3 invIa;
 
 	// COLLISION CHECKS
 	for (int i = 0; i < SPHERES_COUNT + CAGE_PLANES_COUNT; i++) {
@@ -232,21 +230,27 @@ void euler(float dt, RigidSphere& sph) {
 		{
 			if (colliders[i]->checkCollision(sph.position, sph.rad)) 
 			{
+				FindContactPoint(sph, dt, colliders[i], COLLISION_ACCURACY, COLLISION_TOLERANCE);
+				
+				
+				invIa = sph.rotation * glm::inverse(sph.IBody()) * glm::transpose(sph.rotation);
+				glm::vec3 pa = sph.velocity + glm::cross(sph.angularVelocity, sph.contactPoint - sph.position);
+					
+				
 				RigidSphere* sphere;
 				sphere = dynamic_cast<RigidSphere*>(colliders[i]);
 				if (sphere != NULL)
 				{
-					FindContactPoint(sph, dt, colliders[i], COLLISION_ACCURACY, COLLISION_TOLERANCE);
-					
-					std::cout << "Sphere-Sphere Collision!" << std::endl;
+
 					// SPHERES COLLISION
-					glm::mat3 newIntertiaTensor = sph.rotation * glm::inverse(sph.IBody()) * glm::transpose(sph.rotation);
+					std::cout << "Sphere-Sphere Collision!" << std::endl;
 					
 					// TODO: Calculate vrel
-					glm::vec3 pa = sph.velocity + glm::cross(sph.angularVelocity, sph.contactPoint - sph.position);
 					glm::vec3 pb = sphere->velocity + glm::cross(sphere->angularVelocity, sphere->contactPoint - sphere->position);
+					glm::mat3 invIb = sphere->rotation * glm::inverse(sphere->IBody()) * glm::transpose(sphere->rotation);
+
 					float vrel = glm::dot(glm::normalize(sph.position - sph.contactPoint), pa - pb);
-					float j = computeImpulseCorrection(sph.mass, sph.position, inertiaTensorInverse, sphere->mass, sphere->position, newIntertiaTensor, 
+					float j = computeImpulseCorrection(sph.mass, sph.position, invIa, sphere->mass, sphere->position, invIb,
 						vrel, RESTITUTION_FACTOR, glm::normalize(sph.position - sph.contactPoint));
 					
 					sph.j = j;
@@ -264,29 +268,23 @@ void euler(float dt, RigidSphere& sph) {
 					plane = dynamic_cast<PlaneCol*>(colliders[i]);
 					if (plane != NULL) 
 					{
-						FindContactPoint(sph, dt, colliders[i], COLLISION_ACCURACY, COLLISION_TOLERANCE);
-
 						// PLANES COLLISION
-						glm::vec3 pNorm;
-						float d;
-						plane->getPlane(pNorm, d);
-
 						std::cout << "Sphere-Plane Collision!" << std::endl;
-						glm::mat3 newIntertiaTensor = sph.rotation * glm::inverse(sph.IBody()) * glm::transpose(sph.rotation);
 
 						//// TODO: Calculate vrel
-						glm::vec3 pa = sph.velocity + glm::cross(sph.angularVelocity, sph.contactPoint - sph.position);
 
 						float vrel = glm::dot(glm::normalize(sph.position - sph.contactPoint), pa);
-						float j = computeImpulseCorrection(sph.mass, sph.position, inertiaTensorInverse, -1, plane->contactPoint, newIntertiaTensor,
+						float j = computeImpulseCorrection(sph.mass, sph.position, invIa, -1, plane->contactPoint, glm::mat3(0),
 							vrel, RESTITUTION_FACTOR, glm::normalize(sph.position - sph.contactPoint));
 
+						sph.j = j;
 						//updateColliders(&sph, plane);
 
 					}
 					plane = 0;
 					delete(plane);
 				}
+
 			}
 		}
 
@@ -294,8 +292,10 @@ void euler(float dt, RigidSphere& sph) {
 
 	sph.prevPosition = sph.position;
 
-	glm::vec3 angularVel = inertiaTensorInverse * sph.angularMomentum;
-	sph.rotation += dt * (angularVel * sph.rotation);
+	glm::vec3 angularVel = invIa * sph.angularMomentum;
+	sph.angularVelocity = angularVel;
+
+	sph.rotation += dt * (sph.angularVelocity * sph.rotation);
 }
 
 
@@ -355,7 +355,7 @@ void GUI() {
 		}
 
 		ImGui::DragFloat("Gravity Value", &GRAVITY_FORCE, 0.1f, GRAVITY_MIN, GRAVITY_MAX, "%.3f");
-		ImGui::DragFloat3("Gravity Vector", &GRAVITY_VECTOR.x, 0.1f, 0, 1, "%.3f");
+		ImGui::DragFloat3("Gravity Vector", &GRAVITY_VECTOR.x, 0.1f, -1, 1, "%.3f");
 		ImGui::DragFloat("Elasticity", &RESTITUTION_FACTOR, 0.05f, 0.0f, 1.0f, "%.3f");
 
 
@@ -386,7 +386,7 @@ void PhysicsReset() {
 		colliders.push_back(new RigidSphere(glm::vec3((CAGE_SIZE / 2) - (Tools::Random() * (CAGE_SIZE / 2)),
 			Tools::Random() * CAGE_SIZE,
 			(CAGE_SIZE / 2) - (Tools::Random() * (CAGE_SIZE / 2))),
-			SPHERE_MASS, SPHERE_RADIUS, glm::vec3(Tools::Map(Tools::Random(), 0, 1, -3, 3), Tools::Map(Tools::Random(), 0, 1, -3, 3), Tools::Map(Tools::Random(), 0, 1, -3, 3)),
+			SPHERE_START_MASS, SPHERE_START_RADIUS, glm::vec3(Tools::Map(Tools::Random(), 0, 1, -3, 3), Tools::Map(Tools::Random(), 0, 1, -3, 3), Tools::Map(Tools::Random(), 0, 1, -3, 3)),
 			glm::vec3(Tools::Map(Tools::Random(), 0, 1, -3, 3), Tools::Map(Tools::Random(), 0, 1, -3, 3), Tools::Map(Tools::Random(), 0, 1, -3, 3))));
 
 	}
