@@ -256,7 +256,7 @@ void euler(float dt, RigidSphere& sph) {
 					sph.j = j;
 					sphere->j = -j;
 					
-					//updateColliders(&sph, sphere);
+					updateColliders(&sph, sphere);
 
 					
 				}
@@ -278,7 +278,7 @@ void euler(float dt, RigidSphere& sph) {
 							vrel, RESTITUTION_FACTOR, glm::normalize(sph.position - sph.contactPoint));
 
 						sph.j = j;
-						//updateColliders(&sph, plane);
+						updateColliders(&sph, plane);
 
 					}
 					plane = 0;
