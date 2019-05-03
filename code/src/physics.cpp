@@ -31,6 +31,9 @@
 #define SPHERE_RADIUS_MIN 0.1f
 #define SPHERE_RADIUS_MAX 10
 
+#define COLLISION_TOLERANCE 10
+#define COLLISION_ACCURACY 10
+
 #pragma region Parameters
 static float GRAVITY_FORCE = 9.81f;					// Gravity Force
 static glm::vec3 GRAVITY_VECTOR = { 0, -1, 0 };		// Gravity Vector
@@ -83,12 +86,13 @@ namespace Cube {
 
 
 struct Collider {
+	glm::vec3 contactPoint;
 	virtual bool checkCollision(const glm::vec3& next_pos, float radius) = 0;
 	//virtual bool findContactPoint(); // TO DO
 };
 
 struct PlaneCol : Collider {
-	glm::vec3 position, planeNormal, contactPoint;
+	glm::vec3 position, planeNormal;
 
 	PlaneCol(){}
 	PlaneCol(glm::vec3 _pos, glm::vec3 _norm) : position(_pos), planeNormal(_norm){}
@@ -106,6 +110,7 @@ struct PlaneCol : Collider {
 
 
 		float distance = ((next_pos.x * norm.x) + (next_pos.y * norm.y) + (next_pos.z * norm.z) + d);
+		contactPoint = next_pos * norm;
 
 		// TODO: FIND REAL COLLISION POINT
 
@@ -120,7 +125,7 @@ struct RigidSphere : Collider {
 	float mass, rad, j;
 	glm::mat3 rotation;
 	glm::vec3 contactPoint;
-	glm::vec3 position, linearMomentum, angularMomentum, velocity, angularVelocity;
+	glm::vec3 prevPosition, position, linearMomentum, angularMomentum, velocity, angularVelocity;
 	
 
 	glm::mat3 IBody() { return SPHERE_IBODY_MATRIX(mass, rad); }
@@ -130,20 +135,35 @@ struct RigidSphere : Collider {
 		mass(_mass), rad(_rad), position(_pos), linearMomentum(_linearVel), angularMomentum(_angularVel)
 	{
 		rotation = glm::mat3(1);
+		prevPosition = position;
 	}
 	bool checkCollision(const glm::vec3& next_pos, float radius) override {
 		//...
 		if (glm::distance(position, next_pos) <= rad + radius) {
 			
-			// TODO: FIND REAL COLLISION POINT
-
 			contactPoint = position + (glm::normalize(position - next_pos) * rad);
+
+
 			return true;
 		}
 		return false;
 	}
 };
 
+void FindContactPoint(RigidSphere& sph, float dt, Collider* col, int accuracy, float tolerance) {
+	// FIND TRUE CONTACT
+	for (int i = 0; i < accuracy; i++) {
+		if (col->checkCollision(sph.position, sph.rad)) {
+			dt -= dt / 2;
+		}
+		else {
+			dt += dt / 2;
+		}
+
+		sph.position = sph.prevPosition + dt * sph.velocity;
+		if (glm::abs(glm::distance(sph.position, col->contactPoint) < tolerance)) break;
+	}
+}
 
 // BOX
 // X -5 / 5
@@ -216,23 +236,25 @@ void euler(float dt, RigidSphere& sph) {
 				sphere = dynamic_cast<RigidSphere*>(colliders[i]);
 				if (sphere != NULL)
 				{
-					/*
+					FindContactPoint(sph, dt, colliders[i], COLLISION_ACCURACY, COLLISION_TOLERANCE);
+					
 					std::cout << "Sphere-Sphere Collision!" << std::endl;
 					// SPHERES COLLISION
 					glm::mat3 newIntertiaTensor = sph.rotation * glm::inverse(sph.IBody()) * glm::transpose(sph.rotation);
 					
 					// TODO: Calculate vrel
-					glm::vec3 pa = sph.velocity + glm::cross(sph.angularVelocity, sph.collisionPoint - sph.position);
-					glm::vec3 pb = sphere->velocity + glm::cross(sphere->angularVelocity, sphere->collisionPoint - sphere->position);
-					float vrel = glm::dot(glm::normalize(sph.position - sph.collisionPoint), pa - pb);
+					glm::vec3 pa = sph.velocity + glm::cross(sph.angularVelocity, sph.contactPoint - sph.position);
+					glm::vec3 pb = sphere->velocity + glm::cross(sphere->angularVelocity, sphere->contactPoint - sphere->position);
+					float vrel = glm::dot(glm::normalize(sph.position - sph.contactPoint), pa - pb);
 					float j = computeImpulseCorrection(sph.mass, sph.position, inertiaTensorInverse, sphere->mass, sphere->position, newIntertiaTensor, 
-						vrel, RESTITUTION_FACTOR, glm::normalize(sph.position - sph.collisionPoint));
+						vrel, RESTITUTION_FACTOR, glm::normalize(sph.position - sph.contactPoint));
 					
 					sph.j = j;
 					sphere->j = -j;
 					
-					updateColliders(&sph, sphere);
-					*/
+					//updateColliders(&sph, sphere);
+
+					
 				}
 				else
 				{
@@ -242,6 +264,8 @@ void euler(float dt, RigidSphere& sph) {
 					plane = dynamic_cast<PlaneCol*>(colliders[i]);
 					if (plane != NULL) 
 					{
+						FindContactPoint(sph, dt, colliders[i], COLLISION_ACCURACY, COLLISION_TOLERANCE);
+
 						// PLANES COLLISION
 						glm::vec3 pNorm;
 						float d;
@@ -257,7 +281,7 @@ void euler(float dt, RigidSphere& sph) {
 						float j = computeImpulseCorrection(sph.mass, sph.position, inertiaTensorInverse, -1, plane->contactPoint, newIntertiaTensor,
 							vrel, RESTITUTION_FACTOR, glm::normalize(sph.position - sph.contactPoint));
 
-						updateColliders(&sph, plane);
+						//updateColliders(&sph, plane);
 
 					}
 					plane = 0;
@@ -267,6 +291,8 @@ void euler(float dt, RigidSphere& sph) {
 		}
 
 	}
+
+	sph.prevPosition = sph.position;
 
 	glm::vec3 angularVel = inertiaTensorInverse * sph.angularMomentum;
 	sph.rotation += dt * (angularVel * sph.rotation);
@@ -391,7 +417,7 @@ void PhysicsUpdate(float dt) {
 		// Do your update code here...
 
 		counter += dt;
-		if (counter >= 2) {
+		if (counter >= 15) {
 			counter = 0;
 			ResetSimulation();
 		}
