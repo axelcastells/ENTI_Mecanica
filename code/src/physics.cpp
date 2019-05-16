@@ -32,6 +32,8 @@
 #define COLLISION_ACCURACY 10
 
 #pragma region Parameters
+static float SPHERE_MASS = 1;
+static float SPHERE_RADIUS = 1;
 static float GRAVITY_FORCE = 9.81f;					// Gravity Force
 static glm::vec3 GRAVITY_VECTOR = { 0, -1, 0 };		// Gravity Vector
 static float RESTITUTION_FACTOR = 1.f;				// Elasticity
@@ -89,15 +91,13 @@ namespace MeshParticles
 	glm::vec3 kBlood = glm::vec3(0.0f, 0.0f, 0.5f);
 	glm::vec3 y = glm::vec3(0.0f, 1.0f, 0.0f);
 
-	float time, t, w, A, kItalic, density, gravity, vSub;
+	float time, t, w, A, kItalic, density, vSub;
 	float initalDistancePoints = 0.75;
 
 	//Sphere
 	glm::vec3 centerSphere;
 	glm::vec3 sphereVelocity;
 	glm::vec3 sphereForce;
-	float r = 1.0f;
-	float m = 20.0f;
 
 	float* ParticlesToFloatPointer()
 	{
@@ -123,9 +123,6 @@ namespace MeshParticles
 
 		//La longitud del vector
 		kItalic = kBlood.length();
-
-		//Gravetat
-		gravity = -9.8f;
 
 		//DensitatFluit
 		density = 15.0f;
@@ -155,11 +152,11 @@ namespace MeshParticles
 		Mesh::updateMesh(ParticlesToFloatPointer());
 
 		//Sphere
-		r = (rand() % 1) + 1;
+		SPHERE_RADIUS = (rand() % 1) + 1;
 		centerSphere.x = (rand() % 2) - 1;
 		centerSphere.y = (rand() % 3) + 2;
 		centerSphere.z = (rand() % 2) - 1;
-		Sphere::updateSphere(centerSphere, r);
+		Sphere::updateSphere(centerSphere, SPHERE_RADIUS);
 		sphereForce.y = -9.8f;
 
 	}
@@ -167,12 +164,11 @@ namespace MeshParticles
 	//Extret de la practica de rebot de les particules
 	bool DistancePointToPoint(glm::vec3 point)
 	{
-		float distanciaPla = (centerSphere.y - r) - point.y;
+		float distanciaPla = (centerSphere.y - SPHERE_RADIUS) - point.y;
 		return distanciaPla <= 0;
 	}
 	void Update(float dt)
 	{
-		//Temps de simulacio
 		time += dt;
 		if (time >= 20)
 		{
@@ -181,7 +177,7 @@ namespace MeshParticles
 		}
 		else
 		{
-			//Sumatori de la simulacio
+			//Accumulation
 			t += dt;
 			float yPoints = 0.0f;
 			int countPoints = 0;
@@ -202,21 +198,19 @@ namespace MeshParticles
 			}
 
 			//SPHERE
-			//Moure esfera Euler SemiImplicit
+			//Semi-Implicit Euler
 			if (countPoints > 0)
 			{
-				//centerSphere.y = (yPoints / countPoints);
-				float d = (yPoints / countPoints) - (centerSphere.y - r);
-				vSub = d * r*r;
-				bouyancy = density * -gravity * vSub*y;
+				float d = (yPoints / countPoints) - (centerSphere.y - SPHERE_RADIUS);
+				vSub = d * SPHERE_RADIUS*SPHERE_RADIUS;
+				bouyancy = density * GRAVITY_FORCE * vSub*y;
 
 			}
-			sphereForce = bouyancy + glm::vec3(0.0f, gravity, 0.0f)*m;
-			sphereVelocity += dt * sphereForce / m;
+			sphereForce = bouyancy + GRAVITY_FORCE*GRAVITY_VECTOR*SPHERE_MASS;
+			sphereVelocity += dt * sphereForce / SPHERE_MASS;
 			centerSphere = centerSphere + dt * sphereVelocity;
 
-			//Actualitzar
-			Sphere::updateSphere(centerSphere, r);
+			Sphere::updateSphere(centerSphere, SPHERE_RADIUS);
 		}
 	}
 };
@@ -270,11 +264,16 @@ void GUI() {
 
 		//TODO
 		ImGui::Checkbox("Play Simulation", &SIMULATE);
+		ImGui::DragFloat3("Gravity Vector", &GRAVITY_VECTOR.x, 0.1f, -1, 1, "%.3f");
+
+		ImGui::Text("Sphere");
+		ImGui::DragFloat("Mass", &SPHERE_MASS, 0.1f, 0.0f, 30.0f, "%.1f");
+		ImGui::DragFloat("Radius", &SPHERE_RADIUS, 0.1f, 0.1f, 3.0f, "%.1f");
+
 		ImGui::Text("Using Gerstner Wave");
 		ImGui::Text("Time %.1f", MeshParticles::time);
 		ImGui::DragFloat("Frequence", &MeshParticles::w, 0.1f, 1.0f, 10.0f, "%.1f");
 		ImGui::DragFloat("Density", &MeshParticles::density, 0.1f, 15.0f, 20.0f, "%.1f");
-		ImGui::DragFloat("Mass", &MeshParticles::m, 0.1f, 20.0f, 30.0f, "%.1f");
 
 		ImGui::DragFloat("Directoin Waves X", &MeshParticles::kBlood.x, 0.1f, 0.0f, 0.5f, "%.1f");
 
