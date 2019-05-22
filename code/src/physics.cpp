@@ -13,7 +13,7 @@
 
 #define SPHERE_IBODY_MATRIX(m, r) glm::mat3((m * (r*r)) * (2.f/5.f))
 
-#define SPHERES_COUNT 3
+#define SPHERES_COUNT 1
 #define CAGE_SIZE 10
 #define CAGE_PLANES_COUNT 6
 #define SPHERE_START_MASS 3
@@ -98,7 +98,7 @@ struct BuoyantSphere {
 		centerSphere.y = (rand() % 3) + 2;
 		centerSphere.z = (rand() % 2) - 1;
 	}
-	bool DistancePointToPoint(glm::vec3 point)
+	bool DistanceToPoint(glm::vec3 point)
 	{
 		float distanciaPla = (centerSphere.y - SPHERE_RADIUS) - point.y;
 		return distanciaPla <= 0;
@@ -117,7 +117,7 @@ struct FluidSystem {
 glm::vec3 getInitPos(int i, int j, float initY = 3.f) {
 	return glm::vec3(i*MESH_DISTANCE_POINTS, initY, j*MESH_DISTANCE_POINTS);
 }
-glm::vec3 getGerstnerPos(FluidSystem* FLSys, int i, int j, float accum_time = 0.f) {
+glm::vec3 getGerstnerPos(FluidSystem* FLSys, int i, int j,  float accum_time = 0.f) {
 	glm::vec3 v = (FLSys->kBlood / FLSys->kItalic)*AMPLITUDE*sin(dot(FLSys->kBlood, getInitPos(i,j)) - FREQUENCY * accum_time);
 
 	glm::vec3 gerstnerPos;
@@ -167,23 +167,11 @@ namespace System {
 			for (int j = 0; j < Mesh::numCols; j++) {
 				glm::vec3 p = getGerstnerPos(&flsys, i, j, CURRENT_TIME);
 				//points.push_back();
-				if (sph.DistancePointToPoint(p)) {
-
+				if (sph.DistanceToPoint(p)) {
+					// Calcular Gerstner amb la posició de la esfera - radius.y en comptes de usar el getInitPos. Fer un overload de getGerstnerPos per parametritzar-ho.
 				}
-					//				{
-					//					yPoints += list[i].y;
-					//					countPoints++;
-					//				}
-				//points[(Mesh::numRows*i)+j] = getGerstnerPos(&flsys, i, j, CURRENT_TIME);
 			}
 		}
-				
-		// 01234
-		//0
-		//1
-		//2
-		//3
-		//4
 	}
 }
 
