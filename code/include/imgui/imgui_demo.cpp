@@ -787,7 +787,7 @@ void ImGui::ShowTestWindow(bool* p_open)
                 for (int n = 0; n < IM_ARRAYSIZE(saved_palette); n++)
                 {
                     ImGui::ColorConvertHSVtoRGB(n / 31.0f, 0.8f, 0.8f, saved_palette[n].x, saved_palette[n].y, saved_palette[n].z);
-                    saved_palette[n].w = 1.0f; // Alpha
+                    saved_palette[n].FREQUENCY = 1.0f; // Alpha
                 }
             saved_palette_inited = true;
 
@@ -821,7 +821,7 @@ void ImGui::ShowTestWindow(bool* p_open)
                     if ((n % 8) != 0)
                         ImGui::SameLine(0.0f, ImGui::GetStyle().ItemSpacing.y);
                     if (ImGui::ColorButton("##palette", saved_palette[n], ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_NoTooltip, ImVec2(20,20)))
-                        color = ImVec4(saved_palette[n].x, saved_palette[n].y, saved_palette[n].z, color.w); // Preserve alpha!
+                        color = ImVec4(saved_palette[n].x, saved_palette[n].y, saved_palette[n].z, color.FREQUENCY); // Preserve alpha!
 
                     if (ImGui::BeginDragDropTarget())
                     {
@@ -2036,7 +2036,7 @@ void ImGui::ShowStyleEditor(ImGuiStyle* ref)
                 const ImVec4& col = style.Colors[i];
                 const char* name = ImGui::GetStyleColorName(i);
                 if (!output_only_modified || memcmp(&col, &ref->Colors[i], sizeof(ImVec4)) != 0)
-                    ImGui::LogText("colors[ImGuiCol_%s]%*s= ImVec4(%.2ff, %.2ff, %.2ff, %.2ff);" IM_NEWLINE, name, 23-(int)strlen(name), "", col.x, col.y, col.z, col.w);
+                    ImGui::LogText("colors[ImGuiCol_%s]%*s= ImVec4(%.2ff, %.2ff, %.2ff, %.2ff);" IM_NEWLINE, name, 23-(int)strlen(name), "", col.x, col.y, col.z, col.FREQUENCY);
             }
             ImGui::LogFinish();
         }

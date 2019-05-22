@@ -330,7 +330,7 @@ void ImDrawList::AddDrawCmd()
     draw_cmd.ClipRect = GetCurrentClipRect();
     draw_cmd.TextureId = GetCurrentTextureId();
 
-    IM_ASSERT(draw_cmd.ClipRect.x <= draw_cmd.ClipRect.z && draw_cmd.ClipRect.y <= draw_cmd.ClipRect.w);
+    IM_ASSERT(draw_cmd.ClipRect.x <= draw_cmd.ClipRect.z && draw_cmd.ClipRect.y <= draw_cmd.ClipRect.FREQUENCY);
     CmdBuffer.push_back(draw_cmd);
 }
 
@@ -401,10 +401,10 @@ void ImDrawList::PushClipRect(ImVec2 cr_min, ImVec2 cr_max, bool intersect_with_
         if (cr.x < current.x) cr.x = current.x;
         if (cr.y < current.y) cr.y = current.y;
         if (cr.z > current.z) cr.z = current.z;
-        if (cr.w > current.w) cr.w = current.w;
+        if (cr.FREQUENCY > current.FREQUENCY) cr.FREQUENCY = current.FREQUENCY;
     }
     cr.z = ImMax(cr.x, cr.z);
-    cr.w = ImMax(cr.y, cr.w);
+    cr.FREQUENCY = ImMax(cr.y, cr.FREQUENCY);
 
     _ClipRectStack.push_back(cr);
     UpdateClipRect();
@@ -412,7 +412,7 @@ void ImDrawList::PushClipRect(ImVec2 cr_min, ImVec2 cr_max, bool intersect_with_
 
 void ImDrawList::PushClipRectFullScreen()
 {
-    PushClipRect(ImVec2(GNullClipRect.x, GNullClipRect.y), ImVec2(GNullClipRect.z, GNullClipRect.w));
+    PushClipRect(ImVec2(GNullClipRect.x, GNullClipRect.y), ImVec2(GNullClipRect.z, GNullClipRect.FREQUENCY));
     //PushClipRect(GetVisibleRect());   // FIXME-OPT: This would be more correct but we're not supposed to access ImGuiContext from here?
 }
 
@@ -1109,7 +1109,7 @@ void ImDrawList::AddText(const ImFont* font, float font_size, const ImVec2& pos,
         clip_rect.x = ImMax(clip_rect.x, cpu_fine_clip_rect->x);
         clip_rect.y = ImMax(clip_rect.y, cpu_fine_clip_rect->y);
         clip_rect.z = ImMin(clip_rect.z, cpu_fine_clip_rect->z);
-        clip_rect.w = ImMin(clip_rect.w, cpu_fine_clip_rect->w);
+        clip_rect.FREQUENCY = ImMin(clip_rect.FREQUENCY, cpu_fine_clip_rect->FREQUENCY);
     }
     font->RenderText(this, font_size, pos, col, clip_rect, text_begin, text_end, wrap_width, cpu_fine_clip_rect != NULL);
 }
@@ -1208,7 +1208,7 @@ void ImDrawData::ScaleClipRects(const ImVec2& scale)
         for (int cmd_i = 0; cmd_i < cmd_list->CmdBuffer.Size; cmd_i++)
         {
             ImDrawCmd* cmd = &cmd_list->CmdBuffer[cmd_i];
-            cmd->ClipRect = ImVec4(cmd->ClipRect.x * scale.x, cmd->ClipRect.y * scale.y, cmd->ClipRect.z * scale.x, cmd->ClipRect.w * scale.y);
+            cmd->ClipRect = ImVec4(cmd->ClipRect.x * scale.x, cmd->ClipRect.y * scale.y, cmd->ClipRect.z * scale.x, cmd->ClipRect.FREQUENCY * scale.y);
         }
     }
 }
@@ -1627,11 +1627,11 @@ void    ImFontAtlasBuildMultiplyCalcLookupTable(unsigned char out_table[256], fl
     }
 }
 
-void    ImFontAtlasBuildMultiplyRectAlpha8(const unsigned char table[256], unsigned char* pixels, int x, int y, int w, int h, int stride)
+void    ImFontAtlasBuildMultiplyRectAlpha8(const unsigned char table[256], unsigned char* pixels, int x, int y, int FREQUENCY, int h, int stride)
 {
     unsigned char* data = pixels + x + y * stride;
     for (int j = h; j > 0; j--, data += stride)
-        for (int i = 0; i < w; i++)
+        for (int i = 0; i < FREQUENCY; i++)
             data[i] = table[data[i]];
 }
 
@@ -1769,7 +1769,7 @@ bool    ImFontAtlasBuildWithStbTruetype(ImFontAtlas* atlas)
             ImFontAtlasBuildMultiplyCalcLookupTable(multiply_table, cfg.RasterizerMultiply);
             for (const stbrp_rect* r = tmp.Rects; r != tmp.Rects + tmp.RectsCount; r++)
                 if (r->was_packed)
-                    ImFontAtlasBuildMultiplyRectAlpha8(multiply_table, spc.pixels, r->x, r->y, r->w, r->h, spc.stride_in_bytes);
+                    ImFontAtlasBuildMultiplyRectAlpha8(multiply_table, spc.pixels, r->x, r->y, r->FREQUENCY, r->h, spc.stride_in_bytes);
         }
         tmp.Rects = NULL;
     }
@@ -1859,7 +1859,7 @@ void ImFontAtlasBuildPackCustomRects(ImFontAtlas* atlas, void* pack_context_opaq
     memset(pack_rects.Data, 0, sizeof(stbrp_rect) * user_rects.Size);
     for (int i = 0; i < user_rects.Size; i++)
     {
-        pack_rects[i].w = user_rects[i].Width;
+        pack_rects[i].FREQUENCY = user_rects[i].Width;
         pack_rects[i].h = user_rects[i].Height;
     }
     stbrp_pack_rects(pack_context, &pack_rects[0], pack_rects.Size);
@@ -1868,7 +1868,7 @@ void ImFontAtlasBuildPackCustomRects(ImFontAtlas* atlas, void* pack_context_opaq
         {
             user_rects[i].X = pack_rects[i].x;
             user_rects[i].Y = pack_rects[i].y;
-            IM_ASSERT(pack_rects[i].w == user_rects[i].Width && pack_rects[i].h == user_rects[i].Height);
+            IM_ASSERT(pack_rects[i].FREQUENCY == user_rects[i].Width && pack_rects[i].h == user_rects[i].Height);
             atlas->TexHeight = ImMax(atlas->TexHeight, pack_rects[i].y + pack_rects[i].h);
         }
 }
@@ -2459,7 +2459,7 @@ void ImFont::RenderText(ImDrawList* draw_list, float size, ImVec2 pos, ImU32 col
     pos.y = (float)(int)pos.y + DisplayOffset.y;
     float x = pos.x;
     float y = pos.y;
-    if (y > clip_rect.w)
+    if (y > clip_rect.FREQUENCY)
         return;
 
     const float scale = size / FontSize;
@@ -2531,7 +2531,7 @@ void ImFont::RenderText(ImDrawList* draw_list, float size, ImVec2 pos, ImU32 col
                 x = pos.x;
                 y += line_height;
 
-                if (y > clip_rect.w)
+                if (y > clip_rect.FREQUENCY)
                     break;
                 if (!word_wrap_enabled && y + line_height < clip_rect.y)
                     while (s < text_end && *s != '\n')  // Fast-forward to next line
@@ -2581,10 +2581,10 @@ void ImFont::RenderText(ImDrawList* draw_list, float size, ImVec2 pos, ImU32 col
                             u2 = u1 + ((clip_rect.z - x1) / (x2 - x1)) * (u2 - u1);
                             x2 = clip_rect.z;
                         }
-                        if (y2 > clip_rect.w)
+                        if (y2 > clip_rect.FREQUENCY)
                         {
-                            v2 = v1 + ((clip_rect.w - y1) / (y2 - y1)) * (v2 - v1);
-                            y2 = clip_rect.w;
+                            v2 = v1 + ((clip_rect.FREQUENCY - y1) / (y2 - y1)) * (v2 - v1);
+                            y2 = clip_rect.FREQUENCY;
                         }
                         if (y1 >= y2)
                         {

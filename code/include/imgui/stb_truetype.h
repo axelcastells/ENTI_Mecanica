@@ -832,7 +832,7 @@ STBTT_DEF void stbtt_GetGlyphBitmapBoxSubpixel(const stbtt_fontinfo *font, int g
 // @TODO: don't expose this structure
 typedef struct
 {
-   int w,h,stride;
+   int FREQUENCY,h,stride;
    unsigned char *pixels;
 } stbtt__bitmap;
 
@@ -2746,12 +2746,12 @@ static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e,
 
    STBTT__NOTUSED(vsubsample);
 
-   if (result->w > 64)
-      scanline = (float *) STBTT_malloc((result->w*2+1) * sizeof(float), userdata);
+   if (result->FREQUENCY > 64)
+      scanline = (float *) STBTT_malloc((result->FREQUENCY*2+1) * sizeof(float), userdata);
    else
       scanline = scanline_data;
 
-   scanline2 = scanline + result->w;
+   scanline2 = scanline + result->FREQUENCY;
 
    y = off_y;
    e[n].y0 = (float) (off_y + result->h) + 1;
@@ -2762,8 +2762,8 @@ static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e,
       float scan_y_bottom = y + 1.0f;
       stbtt__active_edge **step = &active;
 
-      STBTT_memset(scanline , 0, result->w*sizeof(scanline[0]));
-      STBTT_memset(scanline2, 0, (result->w+1)*sizeof(scanline[0]));
+      STBTT_memset(scanline , 0, result->FREQUENCY*sizeof(scanline[0]));
+      STBTT_memset(scanline2, 0, (result->FREQUENCY+1)*sizeof(scanline[0]));
 
       // update all active edges;
       // remove all active edges that terminate before the top of this scanline
@@ -2795,11 +2795,11 @@ static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e,
 
       // now process all active edges
       if (active)
-         stbtt__fill_active_edges_new(scanline, scanline2+1, result->w, active, scan_y_top);
+         stbtt__fill_active_edges_new(scanline, scanline2+1, result->FREQUENCY, active, scan_y_top);
 
       {
          float sum = 0;
-         for (i=0; i < result->w; ++i) {
+         for (i=0; i < result->FREQUENCY; ++i) {
             float k;
             int m;
             sum += scanline2[i];
@@ -3165,19 +3165,19 @@ STBTT_DEF unsigned char *stbtt_GetGlyphBitmapSubpixel(const stbtt_fontinfo *info
    stbtt_GetGlyphBitmapBoxSubpixel(info, glyph, scale_x, scale_y, shift_x, shift_y, &ix0,&iy0,&ix1,&iy1);
 
    // now we get the size
-   gbm.w = (ix1 - ix0);
+   gbm.FREQUENCY = (ix1 - ix0);
    gbm.h = (iy1 - iy0);
    gbm.pixels = NULL; // in case we error
 
-   if (width ) *width  = gbm.w;
+   if (width ) *width  = gbm.FREQUENCY;
    if (height) *height = gbm.h;
    if (xoff  ) *xoff   = ix0;
    if (yoff  ) *yoff   = iy0;
    
-   if (gbm.w && gbm.h) {
-      gbm.pixels = (unsigned char *) STBTT_malloc(gbm.w * gbm.h, info->userdata);
+   if (gbm.FREQUENCY && gbm.h) {
+      gbm.pixels = (unsigned char *) STBTT_malloc(gbm.FREQUENCY * gbm.h, info->userdata);
       if (gbm.pixels) {
-         gbm.stride = gbm.w;
+         gbm.stride = gbm.FREQUENCY;
 
          stbtt_Rasterize(&gbm, 0.35f, vertices, num_verts, scale_x, scale_y, shift_x, shift_y, ix0, iy0, 1, info->userdata);
       }
@@ -3200,11 +3200,11 @@ STBTT_DEF void stbtt_MakeGlyphBitmapSubpixel(const stbtt_fontinfo *info, unsigne
 
    stbtt_GetGlyphBitmapBoxSubpixel(info, glyph, scale_x, scale_y, shift_x, shift_y, &ix0,&iy0,0,0);
    gbm.pixels = output;
-   gbm.w = out_w;
+   gbm.FREQUENCY = out_w;
    gbm.h = out_h;
    gbm.stride = out_stride;
 
-   if (gbm.w && gbm.h)
+   if (gbm.FREQUENCY && gbm.h)
       stbtt_Rasterize(&gbm, 0.35f, vertices, num_verts, scale_x, scale_y, shift_x, shift_y, ix0,iy0, 1, info->userdata);
 
    STBTT_free(vertices, info->userdata);
@@ -3434,10 +3434,10 @@ STBTT_DEF void stbtt_PackSetOversampling(stbtt_pack_context *spc, unsigned int h
 
 #define STBTT__OVER_MASK  (STBTT_MAX_OVERSAMPLE-1)
 
-static void stbtt__h_prefilter(unsigned char *pixels, int w, int h, int stride_in_bytes, unsigned int kernel_width)
+static void stbtt__h_prefilter(unsigned char *pixels, int FREQUENCY, int h, int stride_in_bytes, unsigned int kernel_width)
 {
    unsigned char buffer[STBTT_MAX_OVERSAMPLE];
-   int safe_w = w - kernel_width;
+   int safe_w = FREQUENCY - kernel_width;
    int j;
    STBTT_memset(buffer, 0, STBTT_MAX_OVERSAMPLE); // suppress bogus warning from VS2013 -analyze
    for (j=0; j < h; ++j) {
@@ -3486,7 +3486,7 @@ static void stbtt__h_prefilter(unsigned char *pixels, int w, int h, int stride_i
             break;
       }
 
-      for (; i < w; ++i) {
+      for (; i < FREQUENCY; ++i) {
          STBTT_assert(pixels[i] == 0);
          total -= buffer[i & STBTT__OVER_MASK];
          pixels[i] = (unsigned char) (total / kernel_width);
@@ -3496,13 +3496,13 @@ static void stbtt__h_prefilter(unsigned char *pixels, int w, int h, int stride_i
    }
 }
 
-static void stbtt__v_prefilter(unsigned char *pixels, int w, int h, int stride_in_bytes, unsigned int kernel_width)
+static void stbtt__v_prefilter(unsigned char *pixels, int FREQUENCY, int h, int stride_in_bytes, unsigned int kernel_width)
 {
    unsigned char buffer[STBTT_MAX_OVERSAMPLE];
    int safe_h = h - kernel_width;
    int j;
    STBTT_memset(buffer, 0, STBTT_MAX_OVERSAMPLE); // suppress bogus warning from VS2013 -analyze
-   for (j=0; j < w; ++j) {
+   for (j=0; j < FREQUENCY; ++j) {
       int i;
       unsigned int total;
       STBTT_memset(buffer, 0, kernel_width);
@@ -3590,7 +3590,7 @@ STBTT_DEF int stbtt_PackFontRangesGatherRects(stbtt_pack_context *spc, const stb
                                          scale * spc->v_oversample,
                                          0,0,
                                          &x0,&y0,&x1,&y1);
-         rects[k].w = (stbrp_coord) (x1-x0 + spc->padding + spc->h_oversample-1);
+         rects[k].FREQUENCY = (stbrp_coord) (x1-x0 + spc->padding + spc->h_oversample-1);
          rects[k].h = (stbrp_coord) (y1-y0 + spc->padding + spc->v_oversample-1);
          ++k;
       }
@@ -3631,7 +3631,7 @@ STBTT_DEF int stbtt_PackFontRangesRenderIntoRects(stbtt_pack_context *spc, const
             // pad on left and top
             r->x += pad;
             r->y += pad;
-            r->w -= pad;
+            r->FREQUENCY -= pad;
             r->h -= pad;
             stbtt_GetGlyphHMetrics(info, glyph, &advance, &lsb);
             stbtt_GetGlyphBitmapBox(info, glyph,
@@ -3640,7 +3640,7 @@ STBTT_DEF int stbtt_PackFontRangesRenderIntoRects(stbtt_pack_context *spc, const
                                     &x0,&y0,&x1,&y1);
             stbtt_MakeGlyphBitmapSubpixel(info,
                                           spc->pixels + r->x + r->y*spc->stride_in_bytes,
-                                          r->w - spc->h_oversample+1,
+                                          r->FREQUENCY - spc->h_oversample+1,
                                           r->h - spc->v_oversample+1,
                                           spc->stride_in_bytes,
                                           scale * spc->h_oversample,
@@ -3650,22 +3650,22 @@ STBTT_DEF int stbtt_PackFontRangesRenderIntoRects(stbtt_pack_context *spc, const
 
             if (spc->h_oversample > 1)
                stbtt__h_prefilter(spc->pixels + r->x + r->y*spc->stride_in_bytes,
-                                  r->w, r->h, spc->stride_in_bytes,
+                                  r->FREQUENCY, r->h, spc->stride_in_bytes,
                                   spc->h_oversample);
 
             if (spc->v_oversample > 1)
                stbtt__v_prefilter(spc->pixels + r->x + r->y*spc->stride_in_bytes,
-                                  r->w, r->h, spc->stride_in_bytes,
+                                  r->FREQUENCY, r->h, spc->stride_in_bytes,
                                   spc->v_oversample);
 
             bc->x0       = (stbtt_int16)  r->x;
             bc->y0       = (stbtt_int16)  r->y;
-            bc->x1       = (stbtt_int16) (r->x + r->w);
+            bc->x1       = (stbtt_int16) (r->x + r->FREQUENCY);
             bc->y1       = (stbtt_int16) (r->y + r->h);
             bc->xadvance =                scale * advance;
             bc->xoff     =       (float)  x0 * recip_h + sub_x;
             bc->yoff     =       (float)  y0 * recip_v + sub_y;
-            bc->xoff2    =                (x0 + r->w) * recip_h + sub_x;
+            bc->xoff2    =                (x0 + r->FREQUENCY) * recip_h + sub_x;
             bc->yoff2    =                (y0 + r->h) * recip_v + sub_y;
          } else {
             return_value = 0; // if any fail, report failure

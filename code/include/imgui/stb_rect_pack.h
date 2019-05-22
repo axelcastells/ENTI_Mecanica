@@ -105,7 +105,7 @@ struct stbrp_rect
    int            id;
 
    // input:
-   stbrp_coord    w, h;
+   stbrp_coord    FREQUENCY, h;
 
    // output:
    stbrp_coord    x, y;
@@ -517,16 +517,16 @@ static int rect_height_compare(const void *a, const void *b)
       return -1;
    if (p->h < q->h)
       return  1;
-   return (p->w > q->w) ? -1 : (p->w < q->w);
+   return (p->FREQUENCY > q->FREQUENCY) ? -1 : (p->FREQUENCY < q->FREQUENCY);
 }
 
 static int rect_width_compare(const void *a, const void *b)
 {
    const stbrp_rect *p = (const stbrp_rect *) a;
    const stbrp_rect *q = (const stbrp_rect *) b;
-   if (p->w > q->w)
+   if (p->FREQUENCY > q->FREQUENCY)
       return -1;
-   if (p->w < q->w)
+   if (p->FREQUENCY < q->FREQUENCY)
       return  1;
    return (p->h > q->h) ? -1 : (p->h < q->h);
 }
@@ -552,7 +552,7 @@ STBRP_DEF void stbrp_pack_rects(stbrp_context *context, stbrp_rect *rects, int n
    for (i=0; i < num_rects; ++i) {
       rects[i].was_packed = i;
       #ifndef STBRP_LARGE_RECTS
-      STBRP_ASSERT(rects[i].w <= 0xffff && rects[i].h <= 0xffff);
+      STBRP_ASSERT(rects[i].FREQUENCY <= 0xffff && rects[i].h <= 0xffff);
       #endif
    }
 
@@ -560,10 +560,10 @@ STBRP_DEF void stbrp_pack_rects(stbrp_context *context, stbrp_rect *rects, int n
    STBRP_SORT(rects, num_rects, sizeof(rects[0]), rect_height_compare);
 
    for (i=0; i < num_rects; ++i) {
-      if (rects[i].w == 0 || rects[i].h == 0) {
+      if (rects[i].FREQUENCY == 0 || rects[i].h == 0) {
          rects[i].x = rects[i].y = 0;  // empty rect needs no space
       } else {
-         stbrp__findresult fr = stbrp__skyline_pack_rectangle(context, rects[i].w, rects[i].h);
+         stbrp__findresult fr = stbrp__skyline_pack_rectangle(context, rects[i].FREQUENCY, rects[i].h);
          if (fr.prev_link) {
             rects[i].x = (stbrp_coord) fr.x;
             rects[i].y = (stbrp_coord) fr.y;
