@@ -183,6 +183,7 @@ namespace System {
 	std::vector<glm::vec3> points;
 
 	void Init() {
+		CURRENT_TIME = 0;
 		sph.Init();
 	}
 	void Update(float dt) {
