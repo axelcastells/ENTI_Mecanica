@@ -42,9 +42,10 @@ static bool SIMULATE = true;						// Simulation Boolean
 static float TIME_SCALE = 1.f;						// Time Scale
 static float CURRENT_TIME = 0.f;
 
-static float FREQUENCY = 1.f;
-static float AMPLITUDE = 1.f;
+//static float FREQUENCY = 1.f;
+//static float AMPLITUDE = 1.f;
 
+static unsigned int WAVES_COUNT = 3;
 #pragma endregion
 
 
@@ -110,14 +111,36 @@ struct BuoyantSphere {
 	}
 };
 
+struct Wave {
+	Wave() {
+		frequence = (rand() % 2) + 0.1f;
+		amplitude = (rand() % 2) + 0.1f;
+		kBlood = glm::vec3((rand() % 2) - 1, (rand() % 2) - 1, (rand() % 2) - 1);
+		y = glm::vec3(0.0f, 1.0f, 0.0f);
+		density = 15;
+		vSub = 0;
+		kItalic = kBlood.length();
+	}
+
+	glm::vec3 kBlood;
+	glm::vec3 y;
+
+	float frequence;
+	float amplitude;
+
+	float kItalic;
+	float density;
+	float vSub;
+};
+
 struct FluidSystem {
-	//std::vector<std::vector<glm::vec3>> list;
-	//std::vector<glm::vec3> initPos;
-	glm::vec3 kBlood = glm::vec3(0.0f, 0.0f, 0.5f);
-	glm::vec3 y = glm::vec3(0.0f, 1.0f, 0.0f);
-
-
-	float kItalic = kBlood.length(), density = 15, vSub = 0;
+	std::vector<Wave> waves;
+	inline Wave& operator[](int i) {
+		return waves[i];
+	}
+	inline unsigned int size() {
+		return waves.size();
+	}
 };
 
 FluidSystem flsys;
@@ -127,49 +150,51 @@ glm::vec3 getInitPos(int i, int j, float initY = 3.f) {
 	return glm::vec3(i*MESH_DISTANCE_POINTS, initY, j*MESH_DISTANCE_POINTS);
 }
 glm::vec3 getGerstnerPos(FluidSystem* FLSys, glm::vec3 position, float accum_time = 0.f) {
-	glm::vec3 v = (FLSys->kBlood / FLSys->kItalic)*AMPLITUDE*sin(dot(FLSys->kBlood, position) - FREQUENCY * accum_time);
-
+	FluidSystem& FS = *FLSys;
+	
 	glm::vec3 gerstnerPos;
-	gerstnerPos.x = position.x - v.x;// FLSys->initPos[i].x - v.x;
-	gerstnerPos.z = position.z - v.z;//FLSys->initPos[i].z - v.z;
-	gerstnerPos.y = (glm::vec3(AMPLITUDE*cos(dot(FLSys->kBlood, position) - FREQUENCY * accum_time))).y;
+	for (int k = 0; k < FS.size(); k++) {
+		glm::vec3 v = (FS[k].kBlood / FS[k].kItalic)*FS[k].amplitude*sin(dot(FS[k].kBlood, position) - FS[k].frequence * accum_time);
+
+		gerstnerPos.x = position.x - v.x;// FLSys->initPos[i].x - v.x;
+		gerstnerPos.z = position.z - v.z;//FLSys->initPos[i].z - v.z;
+		gerstnerPos.y += (glm::vec3(FS[k].amplitude*cos(dot(FS[k].kBlood, position) - FS[k].frequence * accum_time))).y;
+	}
 
 	return gerstnerPos;
 }
 glm::vec3 getGerstnerPos(FluidSystem* FLSys, int i, int j,  float accum_time = 0.f) {
-	glm::vec3 v = (FLSys->kBlood / FLSys->kItalic)*AMPLITUDE*sin(dot(FLSys->kBlood, getInitPos(i,j)) - FREQUENCY * accum_time);
-
+	FluidSystem& FS = *FLSys;
+	
 	glm::vec3 gerstnerPos;
-	gerstnerPos.x = getInitPos(i, j).x - v.x;// FLSys->initPos[i].x - v.x;
-	gerstnerPos.z = getInitPos(i, j).z - v.z;//FLSys->initPos[i].z - v.z;
-	gerstnerPos.y = (glm::vec3(AMPLITUDE*cos(dot(FLSys->kBlood, getInitPos(i,j)) - FREQUENCY * accum_time))).y;
+	for (int k = 0; k < FS.size(); k++) {
+		glm::vec3 v = (FS[k].kBlood / FS[k].kItalic)*FS[k].amplitude*sin(dot(FS[k].kBlood, getInitPos(i,j)) - FS[k].frequence * accum_time);
+
+		gerstnerPos.x = getInitPos(i, j).x - v.x;// FLSys->initPos[i].x - v.x;
+		gerstnerPos.z = getInitPos(i, j).z - v.z;//FLSys->initPos[i].z - v.z;
+		gerstnerPos.y += (glm::vec3(FS[k].amplitude*cos(dot(FS[k].kBlood, getInitPos(i,j)) - FS[k].frequence * accum_time))).y;
+	}
 
 	return gerstnerPos;
-	//if (DistancePointToPoint(list[i]))
-	//{
-	//	yPoints += list[i].y;
-	//	countPoints++;
-	//}
 }
 void updateSphere(FluidSystem* FLSys, BuoyantSphere* BSph, float accum_time, float dt) {
 
 	BSph->sphereForce = BSph->bouyancy + GRAVITY_FORCE * GRAVITY_VECTOR*SPHERE_MASS;
-	BSph->sphereVelocity += dt * BSph->sphereForce / SPHERE_MASS;
+	BSph->sphereVelocity = dt * BSph->sphereForce / SPHERE_MASS;
 	BSph->centerSphere = BSph->centerSphere + dt * BSph->sphereVelocity;
 
 	Sphere::updateSphere(BSph->centerSphere, SPHERE_RADIUS);
 }
 
 glm::vec3 computeBuoyancyForce(FluidSystem* FLSys, BuoyantSphere* BSph, float accum_time) {
+	FluidSystem& FS = *FLSys;
+	glm::vec3 buoyancy;
+	for (int i = 0; i < FS.size(); i++) {
+		float d = (BSph->yPoints / BSph->countPoints) - (BSph->centerSphere.y - SPHERE_RADIUS);
+		FS[i].vSub = d * SPHERE_RADIUS*SPHERE_RADIUS;
+		buoyancy += FS[i].density * GRAVITY_FORCE * FS[i].vSub*FS[i].y;
 
-	float d = (BSph->yPoints / BSph->countPoints) - (BSph->centerSphere.y - SPHERE_RADIUS);
-	FLSys->vSub = d * SPHERE_RADIUS*SPHERE_RADIUS;
-	glm::vec3 buoyancy = FLSys->density * GRAVITY_FORCE * FLSys->vSub*FLSys->y;
-
-	//sphereForce = bouyancy + GRAVITY_FORCE * GRAVITY_VECTOR*SPHERE_MASS;
-	//sphereVelocity += dt * sphereForce / SPHERE_MASS;
-	//centerSphere = centerSphere + dt * sphereVelocity;
-
+	}
 	
 	return buoyancy;
 }
@@ -183,6 +208,10 @@ namespace System {
 	std::vector<glm::vec3> points;
 
 	void Init() {
+		for (int i = 0; i < WAVES_COUNT; i++) {
+			flsys.waves.push_back(Wave());
+		}
+
 		CURRENT_TIME = 0;
 		sph.Init();
 	}
@@ -388,45 +417,8 @@ void renderPrims() {
 		Cube::drawCube();
 }
 
-
-
-void GUI() {
-	{	//FrameRate
-		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-
-		////TODO
-		ImGui::Checkbox("Play Simulation", &SIMULATE);
-		ImGui::DragFloat3("Gravity Vector", &GRAVITY_VECTOR.x, 0.1f, -1, 1, "%.3f");
-
-		ImGui::Text("Sphere");
-		ImGui::DragFloat("Mass", &SPHERE_MASS, 0.1f, 0.0f, 30.0f, "%.1f");
-		ImGui::DragFloat("Radius", &SPHERE_RADIUS, 0.1f, 0.1f, 3.0f, "%.1f");
-
-		ImGui::Text("Using Gerstner Wave");
-		ImGui::Text("Time %.1f", CURRENT_TIME);
-		ImGui::DragFloat("Frequence", &FREQUENCY, 0.1f, 1.0f, 10.0f, "%.1f");
-		ImGui::DragFloat("Amplitude", &AMPLITUDE, 0.1f, 1.0f, 10.0f, "%.1f");
-		ImGui::DragFloat("Density", &flsys.density, 0.1f, 15.0f, 20.0f, "%.1f");
-		
-		ImGui::DragFloat3("Directoin Wave", &flsys.kBlood.x, 0.1f, 0.0f, 0.5f, "%.1f");
-
-		//ImGui::DragFloat("Directoin Waves Z", &Old::kBlood.z, 0.1f, 0.0f, 0.5f, "%.1f");
-
-		if (ImGui::Button("Reset", ImVec2(50, 20)))
-		{
-			System::Init();
-		}
-	}
-
-	// Example code -- ImGui test window. Most of the sample code is in ImGui::ShowTestWindow()
-	bool show_test_window = false;
-	if (show_test_window) {
-		ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);
-		ImGui::ShowTestWindow(&show_test_window);
-	}
-}
-
 void PhysicsReset() {
+	flsys.waves.clear();
 	System::Init();
 	//Old::Init();
 }
@@ -442,6 +434,47 @@ void PhysicsInit() {
 	PhysicsReset();
 	// ...................................
 }
+
+void GUI() {
+	{	//FrameRate
+		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+
+		////TODO
+		ImGui::Checkbox("Play Simulation", &SIMULATE);
+		ImGui::DragFloat3("Gravity Vector", &GRAVITY_VECTOR.x, 0.1f, -1, 1, "%.3f");
+
+		ImGui::Text("Sphere");
+		ImGui::DragFloat("Mass", &SPHERE_MASS, 0.1f, 0.0f, 30.0f, "%.1f");
+		ImGui::DragFloat("Radius", &SPHERE_RADIUS, 0.1f, 0.1f, 3.0f, "%.1f");
+
+		ImGui::Text("Using Gerstner Wave");
+		ImGui::Text("Time %.1f", CURRENT_TIME);
+		for (int i = 0; i < WAVES_COUNT; i++) {
+			ImGui::Text("Wave: %i", i);
+
+			ImGui::DragFloat3(std::string("Direction: " + std::to_string(i)).c_str(), &flsys[i].kBlood.x, 0.1f, 0.0f, 0.5f, "%.1f");
+			ImGui::DragFloat(std::string("Frequence: " + std::to_string(i)).c_str(), &flsys[i].frequence, 0.1f, 1.0f, 10.0f, "%.1f");
+			ImGui::DragFloat(std::string("Amplitude: " + std::to_string(i)).c_str(), &flsys[i].amplitude, 0.1f, 1.0f, 10.0f, "%.1f");
+			ImGui::DragFloat(std::string("Density: " + std::to_string(i)).c_str(), &flsys[i].density, 0.1f, 15.0f, 20.0f, "%.1f");
+			
+		}
+		
+
+		if (ImGui::Button("Reset", ImVec2(50, 20)))
+		{
+			PhysicsReset();
+		}
+	}
+
+	// Example code -- ImGui test window. Most of the sample code is in ImGui::ShowTestWindow()
+	bool show_test_window = false;
+	if (show_test_window) {
+		ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);
+		ImGui::ShowTestWindow(&show_test_window);
+	}
+}
+
+
 
 void PhysicsUpdate(float dt) {
 	if (SIMULATE) {
