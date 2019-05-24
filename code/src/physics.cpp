@@ -6,8 +6,6 @@
 #include <iostream>
 #include <string>
 
-#include "Tools.h"
-
 #define DEG2RAD 0.0174532924
 #define RAD2DEG 57.29578
 
