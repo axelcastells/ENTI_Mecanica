@@ -6,20 +6,23 @@
 #include <iostream>
 #include <string>
 
-#include "Tools.h"
-
 #define DEG2RAD 0.0174532924
 #define RAD2DEG 57.29578
 
+#define SPHERE_DRAGC 0.47f
+
 #define SPHERE_IBODY_MATRIX(m, r) glm::mat3((m * (r*r)) * (2.f/5.f))
 
-#define SPHERES_COUNT 3
+#define SPHERES_COUNT 1
 #define CAGE_SIZE 10
 #define CAGE_PLANES_COUNT 6
 #define SPHERE_START_MASS 3
 #define SPHERE_START_RADIUS 1
 
+#define MESH_DISTANCE_POINTS 0.75
 //GUI
+#define MESH_OFFSET_X -5
+#define MESH_OFFSET_Z -5
 #define GRAVITY_MIN 0
 #define GRAVITY_MAX 10
 //Sphere 1
@@ -32,12 +35,19 @@
 #define COLLISION_ACCURACY 10
 
 #pragma region Parameters
+static float SPHERE_MASS = 1;
+static float SPHERE_RADIUS = 1;
 static float GRAVITY_FORCE = 9.81f;					// Gravity Force
 static glm::vec3 GRAVITY_VECTOR = { 0, -1, 0 };		// Gravity Vector
 static float RESTITUTION_FACTOR = 1.f;				// Elasticity
-static bool SIMULATE = false;						// Simulation Boolean
+static bool SIMULATE = true;						// Simulation Boolean
 static float TIME_SCALE = 1.f;						// Time Scale
+static float CURRENT_TIME = 0.f;
 
+//static float FREQUENCY = 1.f;
+//static float AMPLITUDE = 1.f;
+
+static unsigned int WAVES_COUNT = 3;
 #pragma endregion
 
 
@@ -82,228 +92,179 @@ namespace Cube {
 }
 
 
-struct Collider {
-	glm::vec3 contactPoint;
-	virtual bool checkCollision(const glm::vec3& next_pos, float radius) = 0;
-	//virtual bool findContactPoint(); // TO DO
-};
-
-struct PlaneCol : Collider {
-	glm::vec3 position, planeNormal;
-
-	PlaneCol(){}
-	PlaneCol(glm::vec3 _pos, glm::vec3 _norm) : position(_pos), planeNormal(_norm){}
-
-	void getPlane(glm::vec3& normal, float& d) {
-		normal = planeNormal;
-		d = glm::dot(-normal, position);
+struct BuoyantSphere {
+	glm::vec3 centerSphere;
+	glm::vec3 sphereVelocity;
+	glm::vec3 sphereForce;
+	float yPoints;
+	int countPoints;
+	void Init() {
+		SPHERE_RADIUS = (rand() % 1) + 1;
+		centerSphere.x = (rand() % 2) - 1;
+		centerSphere.y = (rand() % 3) + 2;
+		centerSphere.z = (rand() % 2) - 1;
 	}
-
-	bool checkCollision(const glm::vec3& next_pos, float radius) override {
-		//return false;
-		glm::vec3 norm;
-		float d;
-		getPlane(norm, d);
-
-
-		float distance = ((next_pos.x * norm.x) + (next_pos.y * norm.y) + (next_pos.z * norm.z) + d);
-		contactPoint = next_pos * norm;
-
-		// TODO: FIND REAL COLLISION POINT
-
-		if (distance <= radius) return true;
-		else return false;
-
-	}
-};
-
-struct RigidSphere : Collider {
-	//...
-	float mass, rad, j;
-	glm::mat3 rotation;
-	glm::vec3 prevPosition, position, linearMomentum, angularMomentum, velocity, angularVelocity;
-	
-
-	glm::mat3 IBody() { return SPHERE_IBODY_MATRIX(mass, rad); }
-
-	RigidSphere() = delete;
-	RigidSphere(glm::vec3 _pos, float _mass, float _rad, glm::vec3 _linearVel, glm::vec3 _angularVel) :
-		mass(_mass), rad(_rad), position(_pos), linearMomentum(_linearVel), angularMomentum(_angularVel)
+	bool DistanceToPoint(glm::vec3 point)
 	{
-		rotation = glm::mat3(1);
-		prevPosition = position;
-	}
-	bool checkCollision(const glm::vec3& next_pos, float radius) override {
-		//...
-		if (glm::distance(position, next_pos) <= rad + radius) {
-			
-			contactPoint = position + (glm::normalize(position - next_pos) * rad);
-
-
-			return true;
-		}
-		return false;
+		float distanciaPla = (centerSphere.y - SPHERE_RADIUS) - point.y;
+		return distanciaPla <= 0;
 	}
 };
 
-void FindContactPoint(RigidSphere& sph, float dt, Collider* col, int accuracy, float tolerance) {
-	// FIND TRUE CONTACT
-	for (int i = 0; i < accuracy; i++) {
-		if (col->checkCollision(sph.position, sph.rad)) {
-			dt -= dt / 2;
-		}
-		else {
-			dt += dt / 2;
-		}
-
-		sph.position = sph.prevPosition + dt * sph.velocity;
-		if (glm::abs(glm::distance(sph.position, col->contactPoint) < tolerance)) break;
+struct Wave {
+	Wave() {
+		frequence = (rand() % 2) + 0.1f;
+		amplitude = (rand() % 2) + 0.1f;
+		kBlood = glm::vec3((rand() % 2) - 1, (rand() % 2) - 1, (rand() % 2) - 1);
+		y = glm::vec3(0.0f, 1.0f, 0.0f);
+		density = 1;
+		vSub = 1;
+		kItalic = kBlood.length();
 	}
 
-	sph.contactPoint = sph.position + (glm::normalize(col->contactPoint - sph.contactPoint) * sph.rad);
+	glm::vec3 kBlood;
+	glm::vec3 y;
+
+	float frequence;
+	float amplitude;
+
+	float kItalic;
+	float density;
+	float vSub;
+};
+
+struct FluidSystem {
+	std::vector<Wave> waves;
+	inline Wave& operator[](int i) {
+		return waves[i];
+	}
+	inline unsigned int size() {
+		return waves.size();
+	}
+};
+
+FluidSystem flsys;
+BuoyantSphere sph;
+
+glm::vec3 getInitPos(int i, int j, float initY = 3.f) {
+	return glm::vec3(MESH_OFFSET_X+(i*MESH_DISTANCE_POINTS), initY, MESH_OFFSET_Z+(j*MESH_DISTANCE_POINTS));
+}
+glm::vec3 getGerstnerPos(FluidSystem* FLSys, glm::vec3 position, float accum_time = 0.f) {
+	FluidSystem& FS = *FLSys;
+	
+	glm::vec3 gerstnerPos;
+	for (int k = 0; k < FS.size(); k++) {
+		glm::vec3 v = (FS[k].kBlood / FS[k].kItalic)*FS[k].amplitude*sin(dot(FS[k].kBlood, position) - FS[k].frequence * accum_time);
+
+		gerstnerPos.x = position.x - v.x;// FLSys->initPos[i].x - v.x;
+		gerstnerPos.z = position.z - v.z;//FLSys->initPos[i].z - v.z;
+		gerstnerPos.y += (glm::vec3(FS[k].amplitude*cos(dot(FS[k].kBlood, position) - FS[k].frequence * accum_time))).y;
+	}
+
+	return gerstnerPos;
+}
+glm::vec3 getGerstnerPos(FluidSystem* FLSys, int i, int j,  float accum_time = 0.f) {
+	FluidSystem& FS = *FLSys;
+	
+	glm::vec3 gerstnerPos;
+	for (int k = 0; k < FS.size(); k++) {
+		glm::vec3 v = (FS[k].kBlood / FS[k].kItalic)*FS[k].amplitude*sin(dot(FS[k].kBlood, getInitPos(i,j)) - FS[k].frequence * accum_time);
+
+		gerstnerPos.x = getInitPos(i, j).x - v.x;// FLSys->initPos[i].x - v.x;
+		gerstnerPos.z = getInitPos(i, j).z - v.z;//FLSys->initPos[i].z - v.z;
+		gerstnerPos.y += (glm::vec3(FS[k].amplitude*cos(dot(FS[k].kBlood, getInitPos(i,j)) - FS[k].frequence * accum_time))).y;
+	}
+
+	return gerstnerPos;
 }
 
-// BOX
-// X -5 / 5
-// Y 0 / 10
-// Z -5 / 5
-std::vector<Collider*> colliders;
+glm::vec3 computeBuoyancyForce(FluidSystem* FLSys, BuoyantSphere* BSph, float accum_time) {
+	FluidSystem& FS = *FLSys;
+	glm::vec3 buoyancy(0);
+	for (int i = 0; i < FS.size(); i++) {
+		if (BSph->countPoints > 0) {
+			float d = (BSph->yPoints / BSph->countPoints) - (BSph->centerSphere.y - SPHERE_RADIUS);
+			FS[i].vSub = d * SPHERE_RADIUS*SPHERE_RADIUS;
+			buoyancy += FS[i].density * GRAVITY_FORCE * FS[i].vSub*FS[i].y;
 
-float computeImpulseCorrection(float massA, glm::vec3 ra, glm::mat3 invIa, float massB, glm::vec3 rb, glm::mat3 invIb, float vrel, float epsilon, glm::vec3 normal) {
-	// "-vrel" representa la "inversa" de la velocitat real.
+		}
 
-	if (massB < 0) {
-		return -(1 + epsilon)* (vrel) / ((1 / massA) + glm::dot(normal, glm::cross((invIa * glm::cross(ra, normal)), ra)));
-	}
-	else {
-		return -(1 + epsilon)* (vrel) / ((1 / massA) + (1 / massB) + glm::dot(normal, glm::cross((invIa * glm::cross(ra, normal)), ra)) +
-			glm::dot(normal, glm::cross((invIb * glm::cross(rb, normal)), rb)));
 	}
 	
+	return buoyancy;
 }
 
-void updateColliders(Collider* A, Collider* B) {
-	RigidSphere* sphA;
-	RigidSphere* sphB;
-	sphA = dynamic_cast<RigidSphere*>(A);
-	sphB = dynamic_cast<RigidSphere*>(B);
+glm::vec3 computeDragForce(FluidSystem* FLSys, BuoyantSphere* BSph, float accum_time) {
+	FluidSystem& FS = *FLSys;
+	glm::vec3 drag(0);
+	for (int i = 0; i < FS.size(); i++) {
+		if (BSph->countPoints > 0) {
 
-	if (sphA != NULL && sphB != NULL) {
-		sphA->linearMomentum = sphA->linearMomentum + sphA->j * glm::normalize(sphA->position - sphB->position);// glm::cross(sphA->position, (sphA->j*glm::normalize(sphA->position - sphB->position)));
-		sphA->angularMomentum = sphA->angularMomentum + glm::cross(sphA->contactPoint - sphA->position, sphA->j * glm::normalize(sphA->position - sphB->position));
-
-		sphB->linearMomentum = sphB->linearMomentum + sphB->j * glm::normalize(sphB->position - sphA->position);
-		sphB->angularMomentum = sphB->angularMomentum + glm::cross(sphB->contactPoint - sphB->position, sphB->j * glm::normalize(sphA->position - sphA->position));
-	}
-	else if (sphA != NULL) {
-		PlaneCol* plane = dynamic_cast<PlaneCol*>(B);
-		if (plane != NULL) {
-			sphA->linearMomentum = sphA->linearMomentum + sphA->j * glm::normalize(sphA->position - plane->contactPoint);// glm::cross(sphA->position, (sphA->j*glm::normalize(sphA->position - sphB->position)));
-			sphA->angularMomentum = sphA->angularMomentum + glm::cross(sphA->contactPoint - sphA->position, sphA->j * glm::normalize(sphA->position - plane->contactPoint));
+			glm::vec3 relativeVel = BSph->sphereVelocity - FS[i].kBlood;
+			glm::vec3 relativeVelMod = glm::vec3(relativeVel.x * glm::length(relativeVel), relativeVel.y * glm::length(relativeVel), relativeVel.z * glm::length(relativeVel));
+			
+			float values = -0.5*FS[i].density*SPHERE_DRAGC * glm::abs(BSph->yPoints / BSph->countPoints);
+			drag += values*relativeVelMod;
 		}
-		plane = 0;
-		delete(plane);
 	}
-
-	sphA = 0;
-	sphB = 0;
-	delete(sphA);
-	delete(sphB);
-	
+	return drag;
 }
 
-void euler(float dt, RigidSphere& sph) {
-	glm::vec3 force = (GRAVITY_FORCE * sph.mass * GRAVITY_VECTOR);
-	glm::vec3 torque = glm::cross(sph.contactPoint - sph.position, force);
-	sph.linearMomentum = sph.linearMomentum + dt*force;
-	sph.angularMomentum = sph.angularMomentum + dt*torque;
+void updateSphere(FluidSystem* FLSys, BuoyantSphere* BSph, float accum_time, float dt) {
 
-	sph.velocity = sph.linearMomentum / sph.mass;
-	sph.position = sph.position + dt* sph.velocity;
+	glm::vec3 force = computeBuoyancyForce(&flsys, &sph, accum_time);
+	glm::vec3 drag = computeDragForce(&flsys, &sph, accum_time);
 
-	glm::mat3 invIa;
+	BSph->sphereForce += force + drag + GRAVITY_FORCE * GRAVITY_VECTOR*SPHERE_MASS;
+	BSph->sphereVelocity = dt * BSph->sphereForce / SPHERE_MASS;
+	BSph->centerSphere = BSph->centerSphere + dt * BSph->sphereVelocity;
 
-	// COLLISION CHECKS
-	for (int i = 0; i < SPHERES_COUNT + CAGE_PLANES_COUNT; i++) {
-		if (colliders[i] == &sph);
-		else 
-		{
-			if (colliders[i]->checkCollision(sph.position, sph.rad)) 
-			{
-				FindContactPoint(sph, dt, colliders[i], COLLISION_ACCURACY, COLLISION_TOLERANCE);
-				
-				
-				invIa = sph.rotation * glm::inverse(sph.IBody()) * glm::transpose(sph.rotation);
-				glm::vec3 pa = sph.velocity + glm::cross(sph.angularVelocity, sph.contactPoint - sph.position);
-					
-				
-				RigidSphere* sphere;
-				sphere = dynamic_cast<RigidSphere*>(colliders[i]);
-				if (sphere != NULL)
-				{
+	Sphere::updateSphere(BSph->centerSphere, SPHERE_RADIUS);
+}
 
-					// SPHERES COLLISION
-					std::cout << "Sphere-Sphere Collision!" << std::endl;
-					
-					// TODO: Calculate vrel
-					glm::vec3 pb = sphere->velocity + glm::cross(sphere->angularVelocity, sphere->contactPoint - sphere->position);
-					glm::mat3 invIb = sphere->rotation * glm::inverse(sphere->IBody()) * glm::transpose(sphere->rotation);
+namespace System {
 
-					float vrel = glm::dot(glm::normalize(sph.position - sph.contactPoint), pa - pb);
-					float j = computeImpulseCorrection(sph.mass, sph.position, invIa, sphere->mass, sphere->position, invIb,
-						vrel, RESTITUTION_FACTOR, glm::normalize(sph.position - sph.contactPoint));
-					
-					sph.j = j;
-					sphere->j = -j;
-					
-					updateColliders(&sph, sphere);
+	std::vector<glm::vec3> points;
 
-					
+	void Init() {
+		for (int i = 0; i < WAVES_COUNT; i++) {
+			flsys.waves.push_back(Wave());
+		}
+
+		CURRENT_TIME = 0;
+		sph.Init();
+	}
+	void Update(float dt) {
+		CURRENT_TIME += dt;
+		points.clear();
+
+		glm::vec3 force(0), drag(0);
+		sph.yPoints = 0;
+		sph.countPoints = 0;
+
+		for (int i = 0; i < Mesh::numRows; i++) {
+			for (int j = 0; j < Mesh::numCols; j++) {
+				glm::vec3 p = getGerstnerPos(&flsys, i, j, CURRENT_TIME);
+				points.push_back(p);
+
+				if (sph.DistanceToPoint(getGerstnerPos(&flsys, sph.centerSphere, CURRENT_TIME))) {
+					sph.yPoints += getGerstnerPos(&flsys, sph.centerSphere, CURRENT_TIME).y;
+					sph.countPoints++;
 				}
-				else
-				{
-					sphere = 0;
-					delete(sphere);
-					PlaneCol* plane;
-					plane = dynamic_cast<PlaneCol*>(colliders[i]);
-					if (plane != NULL) 
-					{
-						// PLANES COLLISION
-						std::cout << "Sphere-Plane Collision!" << std::endl;
-
-						//// TODO: Calculate vrel
-
-						float vrel = glm::dot(glm::normalize(sph.position - sph.contactPoint), pa);
-						float j = computeImpulseCorrection(sph.mass, sph.position, invIa, -1, plane->contactPoint, glm::mat3(0),
-							vrel, RESTITUTION_FACTOR, glm::normalize(sph.position - sph.contactPoint));
-
-						sph.j = j;
-						updateColliders(&sph, plane);
-
-					}
-					plane = 0;
-					delete(plane);
-				}
-
+				
 			}
 		}
-
+		
+		updateSphere(&flsys, &sph, CURRENT_TIME, dt);
 	}
-
-	sph.prevPosition = sph.position;
-
-	glm::vec3 angularVel = invIa * sph.angularMomentum;
-	sph.angularVelocity = angularVel;
-
-	sph.rotation += dt * (sph.angularVelocity * sph.rotation);
 }
 
 
 // Boolean variables allow to show/hide the primitives
 bool renderSphere = true;
 bool renderCapsule = false;
-bool renderParticles = false;
-bool renderMesh = false;
+bool renderParticles = true;
+bool renderMesh = true;
 bool renderFiber = false;
 bool renderCube = false;
 
@@ -317,7 +278,6 @@ void renderPrims() {
 	{
 		for (int i = 0; i < SPHERES_COUNT; i++)
 		{
-			Sphere::updateSphere(dynamic_cast<RigidSphere*>(colliders[i])->position, dynamic_cast<RigidSphere*>(colliders[i])->rad);
 			Sphere::drawSphere();
 		}
 	}
@@ -328,6 +288,7 @@ void renderPrims() {
 		int startDrawingFromParticle = 0;
 		int numParticlesToDraw = Particles::maxParticles;
 		Particles::drawParticles(startDrawingFromParticle, numParticlesToDraw);
+
 	}
 
 	if (renderMesh)
@@ -339,63 +300,11 @@ void renderPrims() {
 		Cube::drawCube();
 }
 
-
-
-void GUI() {
-	bool show = true;
-	ImGui::Begin("Physics Parameters", &show, 0);
-
-	// Do your GUI code here....
-	{	
-		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
-		ImGui::Checkbox("Play/Pause Simulation", &SIMULATE);
-		if(ImGui::Button("Reset Simulation", ImVec2(130, 20))) 
-		{
-			ResetSimulation();
-		}
-
-		ImGui::DragFloat("Gravity Value", &GRAVITY_FORCE, 0.1f, GRAVITY_MIN, GRAVITY_MAX, "%.3f");
-		ImGui::DragFloat3("Gravity Vector", &GRAVITY_VECTOR.x, 0.1f, -1, 1, "%.3f");
-		ImGui::DragFloat("Elasticity", &RESTITUTION_FACTOR, 0.05f, 0.0f, 1.0f, "%.3f");
-
-
-		for (int i = 0; i < SPHERES_COUNT; i++) {
-			std::string name("Sphere " + std::to_string(i));
-			RigidSphere* sphere = dynamic_cast<RigidSphere*>(colliders[i]);
-			ImGui::Text(name.c_str());
-			ImGui::DragFloat(std::string("Mass " + std::to_string(i)).c_str(), &sphere->mass, 0.1f, SPHERE_MASS_MIN, SPHERE_MASS_MAX, "%.3f");
-			ImGui::DragFloat(std::string("Radius " + std::to_string(i)).c_str(), &sphere->rad, 0.1f, SPHERE_RADIUS_MIN, SPHERE_RADIUS_MAX, "%.3f");
-
-		}
-
-	}
-	// .........................
-	
-	ImGui::End();
-
-	// Example code -- ImGui test window. Most of the sample code is in ImGui::ShowTestWindow()
-	bool show_test_window = false;
-	if(show_test_window) {
-		ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);
-		ImGui::ShowTestWindow(&show_test_window);
-	}
-}
-
 void PhysicsReset() {
-	for (int i = 0; i < SPHERES_COUNT; i++) {
-		colliders.push_back(new RigidSphere(glm::vec3((CAGE_SIZE / 2) - (Tools::Random() * (CAGE_SIZE / 2)),
-			Tools::Random() * CAGE_SIZE,
-			(CAGE_SIZE / 2) - (Tools::Random() * (CAGE_SIZE / 2))),
-			SPHERE_START_MASS, SPHERE_START_RADIUS, glm::vec3(Tools::Map(Tools::Random(), 0, 1, -3, 3), Tools::Map(Tools::Random(), 0, 1, -3, 3), Tools::Map(Tools::Random(), 0, 1, -3, 3)),
-			glm::vec3(Tools::Map(Tools::Random(), 0, 1, -3, 3), Tools::Map(Tools::Random(), 0, 1, -3, 3), Tools::Map(Tools::Random(), 0, 1, -3, 3))));
-
-	}
-	colliders.push_back(new PlaneCol(glm::vec3(0, 0, 0), glm::vec3(0, 1, 0)));
-	colliders.push_back(new PlaneCol(glm::vec3(0, CAGE_SIZE, 0), glm::vec3(0, -1, 0)));
-	colliders.push_back(new PlaneCol(glm::vec3(-CAGE_SIZE / 2, 0, 0), glm::vec3(1, 0, 0)));
-	colliders.push_back(new PlaneCol(glm::vec3(CAGE_SIZE / 2, 0, 0), glm::vec3(-1, 0, 0)));
-	colliders.push_back(new PlaneCol(glm::vec3(0, 0, -CAGE_SIZE / 2), glm::vec3(0, 0, 1)));
-	colliders.push_back(new PlaneCol(glm::vec3(0, 0, CAGE_SIZE / 2), glm::vec3(0, 0, -1)));
+	sph = BuoyantSphere();
+	flsys.waves.clear();
+	System::Init();
+	//Old::Init();
 }
 
 void ResetSimulation() {
@@ -410,6 +319,47 @@ void PhysicsInit() {
 	// ...................................
 }
 
+void GUI() {
+	{	//FrameRate
+		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+
+		////TODO
+		ImGui::Checkbox("Play Simulation", &SIMULATE);
+		ImGui::DragFloat3("Gravity Vector", &GRAVITY_VECTOR.x, 0.1f, -1, 1, "%.3f");
+
+		ImGui::Text("Sphere");
+		ImGui::DragFloat("Mass", &SPHERE_MASS, 0.1f, 0.0f, 30.0f, "%.1f");
+		ImGui::DragFloat("Radius", &SPHERE_RADIUS, 0.1f, 0.1f, 3.0f, "%.1f");
+
+		ImGui::Text("Using Gerstner Wave");
+		ImGui::Text("Time %.1f", CURRENT_TIME);
+		for (int i = 0; i < WAVES_COUNT; i++) {
+			ImGui::Text("Wave: %i", i);
+
+			ImGui::DragFloat3(std::string("Direction: " + std::to_string(i)).c_str(), &flsys[i].kBlood.x, 0.1f, 0.0f, 0.5f, "%.1f");
+			ImGui::DragFloat(std::string("Frequence: " + std::to_string(i)).c_str(), &flsys[i].frequence, 0.1f, 1.0f, 10.0f, "%.1f");
+			ImGui::DragFloat(std::string("Amplitude: " + std::to_string(i)).c_str(), &flsys[i].amplitude, 0.1f, 1.0f, 10.0f, "%.1f");
+			ImGui::DragFloat(std::string("Density: " + std::to_string(i)).c_str(), &flsys[i].density, 0.1f, 15.0f, 20.0f, "%.1f");
+			
+		}
+		
+
+		if (ImGui::Button("Reset", ImVec2(50, 20)))
+		{
+			PhysicsReset();
+		}
+	}
+
+	// Example code -- ImGui test window. Most of the sample code is in ImGui::ShowTestWindow()
+	bool show_test_window = false;
+	if (show_test_window) {
+		ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);
+		ImGui::ShowTestWindow(&show_test_window);
+	}
+}
+
+
+
 void PhysicsUpdate(float dt) {
 	if (SIMULATE) {
 
@@ -422,15 +372,15 @@ void PhysicsUpdate(float dt) {
 			ResetSimulation();
 		}
 
-		for (int i = 0; i < SPHERES_COUNT; i++) {
-			euler(dt, dynamic_cast<RigidSphere&>(*colliders[i]));
-		}
+		System::Update(dt);
+		Mesh::updateMesh(&System::points.data()->x);
+		//Old::Update(dt);
+		//Mesh::updateMesh(Old::ParticlesToFloatPointer());
 		// ...........................
 	}
 }
 
 void PhysicsCleanup() {
 	// Do your cleanup code here...
-	colliders.clear();
 	// ............................
 }
