@@ -21,6 +21,8 @@
 
 #define MESH_DISTANCE_POINTS 0.75
 //GUI
+#define MESH_OFFSET_X -5
+#define MESH_OFFSET_Z -5
 #define GRAVITY_MIN 0
 #define GRAVITY_MAX 10
 //Sphere 1
@@ -94,8 +96,6 @@ struct BuoyantSphere {
 	glm::vec3 centerSphere;
 	glm::vec3 sphereVelocity;
 	glm::vec3 sphereForce;
-	glm::vec3 bouyancy;
-	glm::vec3 drag;
 	float yPoints;
 	int countPoints;
 	void Init() {
@@ -117,8 +117,8 @@ struct Wave {
 		amplitude = (rand() % 2) + 0.1f;
 		kBlood = glm::vec3((rand() % 2) - 1, (rand() % 2) - 1, (rand() % 2) - 1);
 		y = glm::vec3(0.0f, 1.0f, 0.0f);
-		density = 15;
-		vSub = 0;
+		density = 1;
+		vSub = 1;
 		kItalic = kBlood.length();
 	}
 
@@ -147,7 +147,7 @@ FluidSystem flsys;
 BuoyantSphere sph;
 
 glm::vec3 getInitPos(int i, int j, float initY = 3.f) {
-	return glm::vec3(i*MESH_DISTANCE_POINTS, initY, j*MESH_DISTANCE_POINTS);
+	return glm::vec3(MESH_OFFSET_X+(i*MESH_DISTANCE_POINTS), initY, MESH_OFFSET_Z+(j*MESH_DISTANCE_POINTS));
 }
 glm::vec3 getGerstnerPos(FluidSystem* FLSys, glm::vec3 position, float accum_time = 0.f) {
 	FluidSystem& FS = *FLSys;
@@ -177,22 +177,17 @@ glm::vec3 getGerstnerPos(FluidSystem* FLSys, int i, int j,  float accum_time = 0
 
 	return gerstnerPos;
 }
-void updateSphere(FluidSystem* FLSys, BuoyantSphere* BSph, float accum_time, float dt) {
-
-	BSph->sphereForce = BSph->bouyancy + GRAVITY_FORCE * GRAVITY_VECTOR*SPHERE_MASS;
-	BSph->sphereVelocity = dt * BSph->sphereForce / SPHERE_MASS;
-	BSph->centerSphere = BSph->centerSphere + dt * BSph->sphereVelocity;
-
-	Sphere::updateSphere(BSph->centerSphere, SPHERE_RADIUS);
-}
 
 glm::vec3 computeBuoyancyForce(FluidSystem* FLSys, BuoyantSphere* BSph, float accum_time) {
 	FluidSystem& FS = *FLSys;
-	glm::vec3 buoyancy;
+	glm::vec3 buoyancy(0);
 	for (int i = 0; i < FS.size(); i++) {
-		float d = (BSph->yPoints / BSph->countPoints) - (BSph->centerSphere.y - SPHERE_RADIUS);
-		FS[i].vSub = d * SPHERE_RADIUS*SPHERE_RADIUS;
-		buoyancy += FS[i].density * GRAVITY_FORCE * FS[i].vSub*FS[i].y;
+		if (BSph->countPoints > 0) {
+			float d = (BSph->yPoints / BSph->countPoints) - (BSph->centerSphere.y - SPHERE_RADIUS);
+			FS[i].vSub = d * SPHERE_RADIUS*SPHERE_RADIUS;
+			buoyancy += FS[i].density * GRAVITY_FORCE * FS[i].vSub*FS[i].y;
+
+		}
 
 	}
 	
@@ -201,8 +196,22 @@ glm::vec3 computeBuoyancyForce(FluidSystem* FLSys, BuoyantSphere* BSph, float ac
 
 glm::vec3 computeDragForce(FluidSystem* FLSys, BuoyantSphere* BSph, float accum_time) {
 	
+
 	return glm::vec3(0);
 }
+
+void updateSphere(FluidSystem* FLSys, BuoyantSphere* BSph, float accum_time, float dt) {
+
+	glm::vec3 force = computeBuoyancyForce(&flsys, &sph, accum_time);
+	glm::vec3 drag = computeDragForce(&flsys, &sph, accum_time);
+
+	BSph->sphereForce += force + GRAVITY_FORCE * GRAVITY_VECTOR*SPHERE_MASS;
+	BSph->sphereVelocity = dt * BSph->sphereForce / SPHERE_MASS;
+	BSph->centerSphere = BSph->centerSphere + dt * BSph->sphereVelocity;
+
+	Sphere::updateSphere(BSph->centerSphere, SPHERE_RADIUS);
+}
+
 namespace System {
 
 	std::vector<glm::vec3> points;
@@ -220,6 +229,8 @@ namespace System {
 		points.clear();
 
 		glm::vec3 force(0), drag(0);
+		sph.yPoints = 0;
+		sph.countPoints = 0;
 
 		for (int i = 0; i < Mesh::numRows; i++) {
 			for (int j = 0; j < Mesh::numCols; j++) {
@@ -229,17 +240,11 @@ namespace System {
 				if (sph.DistanceToPoint(getGerstnerPos(&flsys, sph.centerSphere, CURRENT_TIME))) {
 					sph.yPoints += getGerstnerPos(&flsys, sph.centerSphere, CURRENT_TIME).y;
 					sph.countPoints++;
-
-					force = computeBuoyancyForce(&flsys, &sph, CURRENT_TIME);
-					drag = computeDragForce(&flsys, &sph, CURRENT_TIME);
-
 				}
+				
 			}
 		}
-
-		sph.bouyancy = force;
-		sph.drag = drag;
-
+		
 		updateSphere(&flsys, &sph, CURRENT_TIME, dt);
 	}
 }
@@ -418,6 +423,7 @@ void renderPrims() {
 }
 
 void PhysicsReset() {
+	sph = BuoyantSphere();
 	flsys.waves.clear();
 	System::Init();
 	//Old::Init();
