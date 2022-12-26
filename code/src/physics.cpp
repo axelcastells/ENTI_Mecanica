@@ -217,6 +217,7 @@ void updateSphere(FluidSystem* FLSys, BuoyantSphere* BSph, float accum_time, flo
 
 	BSph->sphereForce += force + drag + GRAVITY_FORCE * GRAVITY_VECTOR*SPHERE_MASS;
 	BSph->sphereVelocity = dt * BSph->sphereForce / SPHERE_MASS;
+	BSph->sphereVelocity = { 0, BSph->sphereVelocity.y, 0 };
 	BSph->centerSphere = BSph->centerSphere + dt * BSph->sphereVelocity;
 
 	Sphere::updateSphere(BSph->centerSphere, SPHERE_RADIUS);
@@ -363,14 +364,14 @@ void GUI() {
 void PhysicsUpdate(float dt) {
 	if (SIMULATE) {
 
-		dt *= TIME_SCALE;
-		// Do your update code here...
+		//dt *= TIME_SCALE;
+		//// Do your update code here...
 
-		counter += dt;
-		if (counter >= 15) {
-			counter = 0;
-			ResetSimulation();
-		}
+		//counter += dt;
+		//if (counter >= 15) {
+		//	counter = 0;
+		//	ResetSimulation();
+		//}
 
 		System::Update(dt);
 		Mesh::updateMesh(&System::points.data()->x);
